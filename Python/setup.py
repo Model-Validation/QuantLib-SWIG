@@ -30,7 +30,7 @@ from distutils.ccompiler import get_default_compiler
 
 class test(Command):
     # Original version of this class posted
-    # by Berthold Höllmann to distutils-sig@python.org
+    # by Berthold Hï¿½llmann to distutils-sig@python.org
     description = "test the distribution prior to install"
 
     user_options = [
@@ -219,7 +219,7 @@ QuantLib (http://quantlib.org/) is a C++ library for financial quantitative
 analysts and developers, aimed at providing a comprehensive software
 framework for quantitative finance.
       """,
-      author           = "QuantLib Team",
+      author           = "QuantLib Team - SEB modifications",
       author_email     = "quantlib-users@lists.sourceforge.net",
       url              = "http://quantlib.org",
       license          = "BSD 3-Clause",
