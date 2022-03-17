@@ -156,7 +156,7 @@ class OvernightIndex : public IborIndex {
                    const Handle<YieldTermStructure>& h =
                                     Handle<YieldTermStructure>());
     %extend {
-        ext::shared_ptr<OvernightIndex> clone(const Handle<YieldTermStructure>& h) {
+        ext::shared_ptr<OvernightIndex> clone(const Handle<YieldTermStructure>& h) const {
             return ext::dynamic_pointer_cast<OvernightIndex>(self->clone(h));
         }
     }
@@ -455,6 +455,7 @@ export_overnight_instance(Sonia);
 export_overnight_instance(FedFunds);
 export_overnight_instance(Nzocr);
 export_overnight_instance(Sofr);
+export_overnight_instance(Estr);
 
 export_swap_instance(EuriborSwapIsdaFixA);
 export_swap_instance(EuriborSwapIsdaFixB);

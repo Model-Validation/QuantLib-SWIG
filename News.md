@@ -1,38 +1,31 @@
 
-Main changes for QuantLib-SWIG 1.23
+Main changes for QuantLib-SWIG 1.25
 ===================================
 
 More details on the changes are available in ChangeLog.txt and at
-<https://github.com/lballabio/QuantLib-SWIG/milestone/16?closed=1>.
+<https://github.com/lballabio/QuantLib-SWIG/milestone/18?closed=1>.
 
-- Exported overloaded constructors for piecewise inflation curves.
+- **Breaking change:** exported updated interface for convertible bonds and their engine.
 
-- Exported new `ZeroInflationCashFlow` class.
+- **Breaking change (except for Python):** renamed `WulinYongDoubleBarrierEngine`
+  to `SuoWangDoubleBarrierEngine`.
 
-- Exported new constructor for `Currency` class (thanks to Marcin Rybacki).
+- Added a few missing methods to `Schedule` (thanks to Ralf Konrad).
 
-- Exported `ZeroCouponSwap` class (thanks to Marcin Rybacki).
+- Exported `CPICoupon`, `CPICashFlow`, `CPILeg`.
 
-- Exported `MCDigitalEngine` class (thanks to Jack Gillett).
+- Exported new argument to `SabrSmileSection` constructor to allow normal volatilities.
 
-- Export updated 30/360 enumeration and constructors.
+- Exported new constructor and `amount` method for `ForwardRateAgreement`.
 
-- Export `AnalyticHestonHullWhiteEngine`, `AnalyticH1HWEngine` and
-  `FdHestonHullWhiteVanillaEngine` classes (thanks to Klaus Spanderen).
+- Exported new constructors for `SofrFutureRateHelper`.
 
-- Added payment lag and payment constructor to a few leg constructors
-  (thanks to Marcin Rybacki).
+- Exported new constructors for zero-inflation curves.
 
-- The `Type` enumeration defined in several swap classes was moved to
-  their base `Swap` class.
+- Exported a few more finite-difference classes (thanks to Klaus Spanderen).
 
-- Updated ISDA CDS example in Python.  The differences between its
-  results and Markit values are now within the desired tolerance
-  (thanks to Francis Duffy).
+- Exported new basis-swap rate helpers.
 
-- Removed constructors of piecewise yield and default curves taking an
-  accuracy parameter (they were removed from the C++ library).
+- Exported `ESTR` class (thanks to Kirill Egorov).
 
-- Bond helper constructors now take a `BondPrice::Type priceType`
-  argument instead of a `bool useCleanPrice` (the latter was removed
-  from the C++ library).
+- Exported `StrippedOptionlet` class.

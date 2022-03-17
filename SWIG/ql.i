@@ -30,7 +30,7 @@
 %{
 #include <ql/quantlib.hpp>
 
-#if QL_HEX_VERSION < 0x01230000
+#if QL_HEX_VERSION < 0x01250000
     #error using an old version of QuantLib, please update
 #endif
 
@@ -114,6 +114,10 @@
 %rename(Divide)        __div__;
 #endif
 
+%{
+// we do not want to see the deprecated warnings here
+QL_DEPRECATED_DISABLE_WARNING
+%}
 
 %include common.i
 %include vectors.i
