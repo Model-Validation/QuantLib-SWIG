@@ -586,10 +586,19 @@ class SwaptionVolatilityMatrix : public SwaptionVolatilityDiscrete {
         }
     }
     
-    std::pair<Size,Size> locate(const Date& optionDate,
-                                const Period& swapTenor) const;
-    std::pair<Size,Size> locate(Time optionTime,
-                                Time swapLength) const;
+    %extend {
+        std::pair<unsigned int, unsigned int> locate(const Date& optionDate,
+                                                     const Period& swapTenor) const {
+            auto sizes = self->locate(optionDate, swapTenor);
+            return { (unsigned int)sizes.first, (unsigned int)sizes.second };
+        }
+        std::pair<unsigned int, unsigned int> locate(Time optionTime,
+                                                     Time swapLength) const {
+            auto sizes = self->locate(optionTime, swapLength);
+            return { (unsigned int)sizes.first, (unsigned int)sizes.second };
+        }
+    }
+
     VolatilityType volatilityType() const;
 };
 
