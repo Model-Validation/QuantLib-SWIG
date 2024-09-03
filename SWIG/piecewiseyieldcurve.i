@@ -25,22 +25,34 @@
 %include interpolation.i
 %include null.i
 
+// %import "std_vector.i"
+// %include "std_shared_ptr.i"
+// %include "quantlib.i"
+// %include "bsplineinterpolation.hpp"
+// %include "splineconstraints.hpp"
+
 // bootstrap traits
 
 %{
 using QuantLib::Discount;
 using QuantLib::ZeroYield;
 using QuantLib::ForwardRate;
+using QuantLib::RateTime;
 %}
 
 struct Discount {};
 struct ZeroYield {};
 struct ForwardRate {};
+struct RateTime {};
 
 // curve
 
 %{
 using QuantLib::PiecewiseYieldCurve;
+using QuantLib::Interpolation;
+using QuantLib::BSplineModel;
+using QuantLib::BSplineStructure;
+using QuantLib::SplineConstraints;
 %}
 
 %{
@@ -144,6 +156,10 @@ class Name : public YieldTermStructure {
     }
     const std::vector<Date>& dates() const;
     const std::vector<Time>& times() const;
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+
     #if !defined(SWIGR)
     std::vector<std::pair<Date,Real> > nodes() const;
     #endif
@@ -160,6 +176,10 @@ export_piecewise_curve(PiecewiseFlatForward,ForwardRate,BackwardFlat);
 export_piecewise_curve(PiecewiseLogLinearDiscount,Discount,LogLinear);
 export_piecewise_curve(PiecewiseLinearForward,ForwardRate,Linear);
 export_piecewise_curve(PiecewiseLinearZero,ZeroYield,Linear);
+export_piecewise_curve(PiecewiseLinearRateTime,RateTime,Linear);
+export_piecewise_curve(PiecewiseRateTimeLinearZero,ZeroYield,RateTimeLinear);
+export_piecewise_curve(PiecewiseMixedRateTimeLinearParabolicZero,ZeroYield,MixedRateTimeLinearParabolic);
+export_piecewise_curve(PiecewiseMixedRateTimeBSplineBSplineZero, ZeroYield,MixedRateTimeBSplineBSpline);
 export_piecewise_curve(PiecewiseCubicZero,ZeroYield,Cubic);
 export_piecewise_curve(PiecewiseLogCubicDiscount,Discount,MonotonicLogCubic);
 export_piecewise_curve(PiecewiseSplineCubicDiscount,Discount,SplineCubic);
@@ -175,8 +195,82 @@ export_piecewise_curve(PiecewiseMonotonicParabolicCubicZero,ZeroYield,MonotonicP
 export_piecewise_curve(PiecewiseLogParabolicCubicDiscount,Discount,LogParabolicCubic);
 export_piecewise_curve(PiecewiseMonotonicLogParabolicCubicDiscount,Discount,MonotonicLogParabolicCubic);
 
+// Expose the BSplineZeroCurve type
+%{
+typedef PiecewiseYieldCurve<ZeroYield, BSplineModel> BSplineZeroCurve;
+%}
 
-// global boostrapper
+%shared_ptr(BSplineZeroCurve);
+class BSplineZeroCurve : public YieldTermStructure {
+public:
+    %extend {
+        BSplineZeroCurve(const Date& settlementDate,
+                         const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
+                         const DayCounter& dayCounter,
+                         const BSplineModel& bsplineModel) {
+            return new BSplineZeroCurve(settlementDate, rateHelpers, dayCounter, bsplineModel);
+        }
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+// Expose the BSplineZeroCurve type
+%{
+typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<Linear> > LinearSpreadCurve;
+typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<BSplineModel> > BSplineSpreadCurve;
+%}
+
+%shared_ptr(LinearSpreadCurve);
+class LinearSpreadCurve : public YieldTermStructure {
+public:
+    %extend {
+        LinearSpreadCurve(const Date& settlementDate,
+                         const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
+                         const DayCounter& dayCounter,
+                         const SpreadedInterpolationModel<Linear>& spreadModel) {
+            return new LinearSpreadCurve(settlementDate, rateHelpers, dayCounter, spreadModel);
+        }
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+%shared_ptr(BSplineSpreadCurve);
+class BSplineSpreadCurve : public YieldTermStructure {
+public:
+    %extend {
+        BSplineSpreadCurve(const Date& settlementDate,
+                         const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
+                         const DayCounter& dayCounter,
+                         const SpreadedInterpolationModel<BSplineModel>& spreadModel) {
+            return new BSplineSpreadCurve(settlementDate, rateHelpers, dayCounter, spreadModel);
+        }
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+
+// global bootstrapper
 // hard-coded to linearly-interpolated, simply-compounded zero rates for now
 
 %{

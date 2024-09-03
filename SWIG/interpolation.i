@@ -80,6 +80,199 @@ make_safe_interpolation(MonotonicLogParabolic,MonotonicLogParabolic);
 
 make_safe_interpolation(LagrangeInterpolation,LagrangeInterpolation); 
 
+%{
+using QuantLib::Interpolation;
+using QuantLib::BSplineModel;
+using QuantLib::BSplineStructure;
+using QuantLib::SplineConstraints;
+using QuantLib::BSplineInterpolation;
+using QuantLib::SpreadedInterpolationModel;
+using QuantLib::SpreadedInterpolation;
+using QuantLib::Linear;
+%}
+
+// Expose the SplineConstraints class
+%shared_ptr(SplineConstraints);
+class SplineConstraints {
+public:
+    // Expose the ConstraintType enum
+    enum class ConstraintType {
+        Equal,
+        LessEqual
+    };
+
+    SplineConstraints(Size nVariables = 0,
+                        const std::vector<std::vector<Real>>& P = {},
+                        const std::vector<std::vector<Real>>& A = {},
+                        const std::vector<Real>& b = {},
+                        const std::vector<Real>& c = {},
+                        const std::vector<ConstraintType>& constraintTypes = {});
+};
+
+// Expose the BSplineStructure class
+%shared_ptr(BSplineStructure);
+class BSplineStructure {
+public:
+    enum class Side {
+        Left,
+        Right,
+        Average,
+        Actual,
+        Inside
+    };
+
+    enum class InterpolationSmoothness {
+        Discontinous, // Internal knots repeated k times for k-th degree spline, aka C^{-1}
+        Continous, // aka C^0 
+        ContinuouslyDifferentiable, // aka C^1
+        TwiceContinuouslyDifferentiable, // aka C^2
+        Hermite,   // Internal knots are double, means C^{k-2} for a k-th degree spline
+        Default // Internal knots are simple, means C^{k-1} for a k-th degree spline
+    };
+
+    BSplineStructure(
+        const std::vector<Real>& simpleKnots,
+        Size degree,
+        const std::vector<Integer>& knotIndices = {},
+        ext::shared_ptr<SplineConstraints>& splineConstraints = ext::make_shared<SplineConstraints>(),
+        InterpolationSmoothness smoothness = InterpolationSmoothness::Default,
+        Side side = Side::Right,
+        Integer requiredPoints = 1,
+        bool isGlobal = true);
+};
+
+// Expose the BSplineModel class
+%shared_ptr(BSplineModel);
+class BSplineModel {
+public:
+    BSplineModel(ext::shared_ptr<BSplineStructure>& spline_structure);
+};
+
+
+// Expose the BSplineInterpolation class
+// %shared_ptr(BSplineInterpolation);
+// class BSplineInterpolation {
+// public:
+//     BSplineInterpolation(
+//       const std::vector<Time>& x, 
+//       const std::vector<Real>& y, 
+//       const ext::shared_ptr<BSplineStructure>& splineStructure
+//     );
+
+
+//     Real operator()(Real x, bool allowExtrapolation = false);
+//     Real derivative(Real x, bool allowExtrapolation = false);
+// };
+
+%{
+// safe versions which copy their arguments
+class SafeBSplineInterpolation {
+  public:
+    SafeBSplineInterpolation(const std::vector<Time>& x, 
+      const std::vector<Real>& y,  const ext::shared_ptr<BSplineStructure>& splineStructure)
+    : x_(x), y_(y), f_(x_.begin(), x_.end(), y_.begin(), splineStructure) {}
+    Real operator()(Real x, bool allowExtrapolation=false) {
+        return f_(x, allowExtrapolation);
+    }
+    std::vector<Time> x_; 
+    std::vector<Real> y_;
+    BSplineInterpolation f_;
+};
+%}
+
+%rename(BSplineInterpolation) SafeBSplineInterpolation;
+class SafeBSplineInterpolation {
+    #if defined(SWIGCSHARP)
+    %rename(call) operator();
+    #endif
+  public:
+    SafeBSplineInterpolation(const std::vector<Time>& x, 
+      const std::vector<Real>& y, const ext::shared_ptr<BSplineStructure>& splineStructure);
+    Real operator()(Real x, bool allowExtrapolation=false);
+};
+
+// %extend SafeBSplineInterpolation {
+//     Real derivative(Real x, bool extrapolate = false) {
+//         return self->f_.derivative(x,extrapolate);
+//     }
+//     Real secondDerivative(Real x, bool extrapolate = false) {
+//         return self->f_.secondDerivative(x,extrapolate);
+//     }
+//     Real primitive(Real x, bool extrapolate = false) {
+//         return self->f_.primitive(x,extrapolate);
+//     }
+// };
+
+// Expose the SpreadedInterpolationModel class
+%shared_ptr(SpreadedInterpolationModel<Linear>);
+%shared_ptr(SpreadedInterpolationModel<BSplineModel>);
+
+template <class Interpolator>
+class SpreadedInterpolationModel {
+public:
+    SpreadedInterpolationModel(Interpolator& factory, ext::shared_ptr<Interpolation>& baseCurve);
+};
+
+%template(SpreadedLinearModel) SpreadedInterpolationModel<Linear>;
+%template(SpreadedSplineModel) SpreadedInterpolationModel<BSplineModel>;
+
+%shared_ptr(Interpolation)
+
+// Expose the SpreadedInterpolation class
+%{
+// safe versions which copy their arguments
+class SafeSpreadedInterpolation {
+  public:
+    template <class Interpolator>
+    SafeSpreadedInterpolation(const std::vector<Time>& x, 
+      const std::vector<Real>& y,  Interpolator& factory, ext::shared_ptr<Interpolation>& baseCurve)
+    : x_(x), y_(y), f_(x_.begin(), x_.end(), y_.begin(), factory, baseCurve) {}
+    Real operator()(Real x, bool allowExtrapolation=false) {
+        return f_(x, allowExtrapolation);
+    }
+    std::vector<Time> x_; 
+    std::vector<Real> y_;
+    SpreadedInterpolation f_;
+};
+%}
+
+// %rename(LinearSpreadedInterpolation) SafeLinearSpreadedInterpolation;
+// %rename(SplineSpreadedInterpolation) SafeSplineSpreadedInterpolation;
+
+class SafeSpreadedInterpolation {
+  public:
+    template <class Interpolator>
+    SafeSpreadedInterpolation(const std::vector<Time>& x, 
+      const std::vector<Real>& y,  Interpolator& factory, ext::shared_ptr<Interpolation>& baseCurve);
+    Real operator()(Real x, bool allowExtrapolation=false);
+
+    %template(LinearSpreadedInterpolation) SafeSpreadedInterpolation<Linear>;
+    %template(SplineSpreadedInterpolation) SafeSpreadedInterpolation<BSplineModel>;
+};
+
+
+// class SafeLinearSpreadedInterpolation {
+//     #if defined(SWIGCSHARP)
+//     %rename(call) operator();
+//     #endif
+//   public:
+//     SafeLinearSpreadedInterpolation(const std::vector<Time>& x, 
+//       const std::vector<Real>& y, Linear& factory,
+//        ext::shared_ptr<Interpolation>& baseCurve);
+//     Real operator()(Real x, bool allowExtrapolation=false);
+// };
+
+// class SafeSplineSpreadedInterpolation {
+//     #if defined(SWIGCSHARP)
+//     %rename(call) operator();
+//     #endif
+//   public:
+//     SafeSplineSpreadedInterpolation(const std::vector<Time>& x, 
+//       const std::vector<Real>& y, BSplineModel& factory,
+//        ext::shared_ptr<Interpolation>& baseCurve);
+//     Real operator()(Real x, bool allowExtrapolation=false);
+// };
+
 %define extend_spline(T)
 %extend Safe##T {
     Real derivative(Real x, bool extrapolate = false) {
@@ -155,12 +348,16 @@ using QuantLib::BackwardFlat;
 using QuantLib::ForwardFlat;
 using QuantLib::Linear;
 using QuantLib::LogLinear;
+using QuantLib::RateTimeLinear;
 using QuantLib::Cubic;
 using QuantLib::Bicubic;
 using QuantLib::ConvexMonotone;
 using QuantLib::DefaultLogCubic;
 using QuantLib::MonotonicLogCubic;
 using QuantLib::KrugerLog;
+using QuantLib::BSplineInterpolation;
+using QuantLib::MixedRateTimeBSplineBSpline;
+using QuantLib::MixedRateTimeLinearParabolic;
 
 class MonotonicCubic : public Cubic {
   public:
@@ -203,6 +400,23 @@ class LogMixedLinearCubic : public QuantLib::LogMixedLinearCubic {
         CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
         bool monotonic = true)
     : QuantLib::LogMixedLinearCubic(n, behavior, da, monotonic) {}
+};
+
+class MixedRateTimeLinearParabolic : public QuantLib::MixedRateTimeLinearParabolic {
+  public:
+    MixedRateTimeLinearParabolic(
+        Size n = 0)
+    : QuantLib::MixedRateTimeLinearParabolic(n) {}
+};
+
+class MixedRateTimeBSplineBSpline : public QuantLib::MixedRateTimeBSplineBSpline {
+  public:
+    MixedRateTimeBSplineBSpline(
+        ext::shared_ptr<BSplineStructure>& splineStructure1 = ext::make_shared<BSplineStructure>(),
+        ext::shared_ptr<BSplineStructure>& splineStructure2 = ext::make_shared<BSplineStructure>(), 
+        Size n = 0,
+        MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges)
+    : QuantLib::MixedRateTimeBSplineBSpline(splineStructure1, splineStructure2, n, behavior) {}
 };
 
 class ParabolicCubic : public QuantLib::Cubic {
@@ -262,6 +476,7 @@ struct BackwardFlat {};
 struct ForwardFlat {};
 struct Linear {};
 struct LogLinear {};
+struct RateTimeLinear {};
 struct Cubic {};
 struct Bicubic {};
 struct MonotonicCubic {};
@@ -291,6 +506,28 @@ struct LogMixedLinearCubic {
         CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
         bool monotonic = true);
 };
+
+struct MixedRateTimeLinearParabolic {
+    #if !defined(SWIGJAVA) && !defined(SWIGCSHARP)
+    %feature("kwargs") MixedRateTimeLinearParabolic;
+    #endif
+    MixedRateTimeLinearParabolic(
+        Size n = 0
+    );
+};
+
+struct MixedRateTimeBSplineBSpline {
+    #if !defined(SWIGJAVA) && !defined(SWIGCSHARP)
+    %feature("kwargs") MixedRateTimeBSplineBSpline;
+    #endif
+    MixedRateTimeBSplineBSpline(
+        ext::shared_ptr<BSplineStructure>& splineStructure1 = {},
+        ext::shared_ptr<BSplineStructure>& splineStructure2 = {},
+        Size n = 0,
+        MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges
+    );
+};
+
 
 %{
 // safe version which copies its arguments
