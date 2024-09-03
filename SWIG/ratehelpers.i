@@ -68,6 +68,7 @@ class RateHelper : public Observable {
 	Date pillarDate() const;
 	Real impliedQuote() const;
 	Real quoteError() const;
+  void setTermStructure(YieldTermStructure* ts);
   private:
     RateHelper();
 };

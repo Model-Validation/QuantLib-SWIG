@@ -36,6 +36,7 @@ using QuantLib::Newton;
 using QuantLib::NewtonSafe;
 using QuantLib::Ridder;
 using QuantLib::Secant;
+using QuantLib::FiniteDifferenceNewtonSafe;
 %}
 
 %define DeclareSolver(SolverName)
@@ -80,6 +81,7 @@ DeclareSolver(Bisection);
 DeclareSolver(FalsePosition);
 DeclareSolver(Ridder);
 DeclareSolver(Secant);
+DeclareSolver(FiniteDifferenceNewtonSafe);
 
 #if defined(SWIGPYTHON)
 // these two need f.derivative()
