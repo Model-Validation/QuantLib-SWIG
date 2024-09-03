@@ -96,3 +96,6 @@ R/QuantLib.RData
 
 .vscode
 **/venv
+Python/hs21_tiny_qp
+Python/hs21_tiny_qp.csv
+Python/qafiro_tiny_qp.csv
