@@ -83,6 +83,7 @@ make_safe_interpolation(LagrangeInterpolation,LagrangeInterpolation);
 %{
 using QuantLib::Interpolation;
 using QuantLib::BSplineModel;
+using QuantLib::BSplineSegment;
 using QuantLib::BSplineStructure;
 using QuantLib::SplineConstraints;
 using QuantLib::BSplineInterpolation;
@@ -109,9 +110,10 @@ public:
                         const std::vector<ConstraintType>& constraintTypes = {});
 };
 
-// Expose the BSplineStructure class
-%shared_ptr(BSplineStructure);
-class BSplineStructure {
+// Expose the BSplineSegment class
+%shared_ptr(BSplineSegment);
+
+class BSplineSegment {
 public:
     enum class Side {
         Left,
@@ -122,32 +124,51 @@ public:
     };
 
     enum class InterpolationSmoothness {
-        Discontinous, // Internal knots repeated k times for k-th degree spline, aka C^{-1}
-        Continous, // aka C^0 
+        Discontinuous, // Internal knots repeated k times for k-th degree spline, aka C^{-1}
+        Continuous, // aka C^0 
         ContinuouslyDifferentiable, // aka C^1
         TwiceContinuouslyDifferentiable, // aka C^2
         Hermite,   // Internal knots are double, means C^{k-2} for a k-th degree spline
         Default // Internal knots are simple, means C^{k-1} for a k-th degree spline
     };
 
-    BSplineStructure(
+    enum class InterpolationTransform {
+      Default,
+      Log,
+      Exp,
+      RateTime
+    };
+
+    BSplineSegment(
         const std::vector<Real>& simpleKnots,
-        Size degree,
-        const std::vector<Integer>& knotIndices = {},
-        ext::shared_ptr<SplineConstraints>& splineConstraints = ext::make_shared<SplineConstraints>(),
-        InterpolationSmoothness smoothness = InterpolationSmoothness::Default,
-        Side side = Side::Right,
-        Integer requiredPoints = 1,
+        Integer degree,
+        const std::vector<Integer>& knotIndices,
+        QuantLib::BSplineSegment::InterpolationSmoothness smoothness = QuantLib::BSplineSegment::InterpolationSmoothness::Default,
+        QuantLib::BSplineSegment::InterpolationTransform interpolationTransform = QuantLib::BSplineSegment::InterpolationTransform::Default,
+        QuantLib::BSplineSegment::Side side = QuantLib::BSplineSegment::Side::Right,
+        Size requiredPoints = 1,
         bool isGlobal = true);
+};
+
+namespace std {
+    %template(BSplineSegmentVector) std::vector<ext::shared_ptr<BSplineSegment>>;
+}
+
+// Expose the BSplineStructure class
+%shared_ptr(BSplineStructure);
+class BSplineStructure {
+public:
+    BSplineStructure(
+            const std::vector<ext::shared_ptr<BSplineSegment>>& splineSegments,
+            const ext::shared_ptr<SplineConstraints>& splineConstraints);
 };
 
 // Expose the BSplineModel class
 %shared_ptr(BSplineModel);
 class BSplineModel {
 public:
-    BSplineModel(ext::shared_ptr<BSplineStructure>& spline_structure);
+    BSplineModel(ext::shared_ptr<BSplineStructure>& splineStructure);
 };
-
 
 // Expose the BSplineInterpolation class
 // %shared_ptr(BSplineInterpolation);
@@ -156,7 +177,7 @@ public:
 //     BSplineInterpolation(
 //       const std::vector<Time>& x, 
 //       const std::vector<Real>& y, 
-//       const ext::shared_ptr<BSplineStructure>& splineStructure
+//       const ext::shared_ptr<BSplineSegment>& splineStructure
 //     );
 
 
@@ -348,7 +369,6 @@ using QuantLib::BackwardFlat;
 using QuantLib::ForwardFlat;
 using QuantLib::Linear;
 using QuantLib::LogLinear;
-using QuantLib::RateTimeLinear;
 using QuantLib::Cubic;
 using QuantLib::Bicubic;
 using QuantLib::ConvexMonotone;
@@ -356,8 +376,6 @@ using QuantLib::DefaultLogCubic;
 using QuantLib::MonotonicLogCubic;
 using QuantLib::KrugerLog;
 using QuantLib::BSplineInterpolation;
-using QuantLib::MixedRateTimeBSplineBSpline;
-using QuantLib::MixedRateTimeLinearParabolic;
 
 class MonotonicCubic : public Cubic {
   public:
@@ -389,35 +407,25 @@ class SplineLogCubic : public QuantLib::LogCubic {
                          CubicInterpolation::SecondDerivative, 0.0) {}
 };
 
-class LogMixedLinearCubic : public QuantLib::LogMixedLinearCubic {
-  public:
-    // We add defaults for all constructor arguments because wrappers for
-    // InterpolatedDiscountCurve and PiecewiseYieldCurve assume that all
-    // interpolators have default constructors.
-    LogMixedLinearCubic(
-        Size n = 0,
-        MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges,
-        CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
-        bool monotonic = true)
-    : QuantLib::LogMixedLinearCubic(n, behavior, da, monotonic) {}
-};
+// class LogMixedLinearCubic : public QuantLib::LogMixedLinearCubic {
+//   public:
+//     // We add defaults for all constructor arguments because wrappers for
+//     // InterpolatedDiscountCurve and PiecewiseYieldCurve assume that all
+//     // interpolators have default constructors.
+//     LogMixedLinearCubic(
+//         Size n = 0,
+//         MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges,
+//         CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
+//         bool monotonic = true)
+//     : QuantLib::LogMixedLinearCubic(n, behavior, da, monotonic) {}
+// };
 
-class MixedRateTimeLinearParabolic : public QuantLib::MixedRateTimeLinearParabolic {
-  public:
-    MixedRateTimeLinearParabolic(
-        Size n = 0)
-    : QuantLib::MixedRateTimeLinearParabolic(n) {}
-};
-
-class MixedRateTimeBSplineBSpline : public QuantLib::MixedRateTimeBSplineBSpline {
-  public:
-    MixedRateTimeBSplineBSpline(
-        ext::shared_ptr<BSplineStructure>& splineStructure1 = ext::make_shared<BSplineStructure>(),
-        ext::shared_ptr<BSplineStructure>& splineStructure2 = ext::make_shared<BSplineStructure>(), 
-        Size n = 0,
-        MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges)
-    : QuantLib::MixedRateTimeBSplineBSpline(splineStructure1, splineStructure2, n, behavior) {}
-};
+// class MixedRateTimeLinearParabolic : public QuantLib::MixedRateTimeLinearParabolic {
+//   public:
+//     MixedRateTimeLinearParabolic(
+//         Size n = 0)
+//     : QuantLib::MixedRateTimeLinearParabolic(n) {}
+// };
 
 class ParabolicCubic : public QuantLib::Cubic {
   public:
@@ -476,7 +484,6 @@ struct BackwardFlat {};
 struct ForwardFlat {};
 struct Linear {};
 struct LogLinear {};
-struct RateTimeLinear {};
 struct Cubic {};
 struct Bicubic {};
 struct MonotonicCubic {};
@@ -496,38 +503,25 @@ struct MonotonicParabolicCubic {};
 struct LogParabolicCubic {};
 struct MonotonicLogParabolicCubic {};
 
-struct LogMixedLinearCubic {
-    #if !defined(SWIGJAVA) && !defined(SWIGCSHARP)
-    %feature("kwargs") LogMixedLinearCubic;
-    #endif
-    LogMixedLinearCubic(
-        Size n = 0,
-        MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges,
-        CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
-        bool monotonic = true);
-};
+// struct LogMixedLinearCubic {
+//     #if !defined(SWIGJAVA) && !defined(SWIGCSHARP)
+//     %feature("kwargs") LogMixedLinearCubic;
+//     #endif
+//     LogMixedLinearCubic(
+//         Size n = 0,
+//         MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges,
+//         CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
+//         bool monotonic = true);
+// };
 
-struct MixedRateTimeLinearParabolic {
-    #if !defined(SWIGJAVA) && !defined(SWIGCSHARP)
-    %feature("kwargs") MixedRateTimeLinearParabolic;
-    #endif
-    MixedRateTimeLinearParabolic(
-        Size n = 0
-    );
-};
-
-struct MixedRateTimeBSplineBSpline {
-    #if !defined(SWIGJAVA) && !defined(SWIGCSHARP)
-    %feature("kwargs") MixedRateTimeBSplineBSpline;
-    #endif
-    MixedRateTimeBSplineBSpline(
-        ext::shared_ptr<BSplineStructure>& splineStructure1 = {},
-        ext::shared_ptr<BSplineStructure>& splineStructure2 = {},
-        Size n = 0,
-        MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges
-    );
-};
-
+// struct MixedRateTimeLinearParabolic {
+//     #if !defined(SWIGJAVA) && !defined(SWIGCSHARP)
+//     %feature("kwargs") MixedRateTimeLinearParabolic;
+//     #endif
+//     MixedRateTimeLinearParabolic(
+//         Size n = 0
+//     );
+// };
 
 %{
 // safe version which copies its arguments

@@ -178,8 +178,7 @@ export_piecewise_curve(PiecewiseLinearForward,ForwardRate,Linear);
 export_piecewise_curve(PiecewiseLinearZero,ZeroYield,Linear);
 export_piecewise_curve(PiecewiseLinearRateTime,RateTime,Linear);
 export_piecewise_curve(PiecewiseRateTimeLinearZero,ZeroYield,RateTimeLinear);
-export_piecewise_curve(PiecewiseMixedRateTimeLinearParabolicZero,ZeroYield,MixedRateTimeLinearParabolic);
-export_piecewise_curve(PiecewiseMixedRateTimeBSplineBSplineZero, ZeroYield,MixedRateTimeBSplineBSpline);
+// export_piecewise_curve(PiecewiseMixedRateTimeLinearParabolicZero, ZeroYield, MixedRateTimeLinearParabolic);
 export_piecewise_curve(PiecewiseCubicZero,ZeroYield,Cubic);
 export_piecewise_curve(PiecewiseLogCubicDiscount,Discount,MonotonicLogCubic);
 export_piecewise_curve(PiecewiseSplineCubicDiscount,Discount,SplineCubic);
@@ -189,7 +188,7 @@ export_piecewise_curve(PiecewiseConvexMonotoneForward,ForwardRate,ConvexMonotone
 export_piecewise_curve(PiecewiseConvexMonotoneZero,ZeroYield,ConvexMonotone);
 export_piecewise_curve(PiecewiseNaturalCubicZero,ZeroYield,SplineCubic);
 export_piecewise_curve(PiecewiseNaturalLogCubicDiscount,Discount,SplineLogCubic);
-export_piecewise_curve(PiecewiseLogMixedLinearCubicDiscount,Discount,LogMixedLinearCubic);
+// export_piecewise_curve(PiecewiseLogMixedLinearCubicDiscount,Discount,LogMixedLinearCubic);
 export_piecewise_curve(PiecewiseParabolicCubicZero,ZeroYield,ParabolicCubic);
 export_piecewise_curve(PiecewiseMonotonicParabolicCubicZero,ZeroYield,MonotonicParabolicCubic);
 export_piecewise_curve(PiecewiseLogParabolicCubicDiscount,Discount,LogParabolicCubic);
@@ -204,17 +203,25 @@ typedef PiecewiseYieldCurve<ZeroYield, BSplineModel> BSplineZeroCurve;
 class BSplineZeroCurve : public YieldTermStructure {
 public:
     %extend {
-        BSplineZeroCurve(const Date& settlementDate,
-                         const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
+        BSplineZeroCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
                          const DayCounter& dayCounter,
                          const BSplineModel& bsplineModel) {
-            return new BSplineZeroCurve(settlementDate, rateHelpers, dayCounter, bsplineModel);
-        }
+            return new BSplineZeroCurve(referenceDate, rateHelpers, dayCounter, bsplineModel);
+        };
+        BSplineZeroCurve(const Date& referenceDate,
+             const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+             const DayCounter& dayCounter,
+             const std::vector<Handle<Quote> >& jumps,
+             const std::vector<Date>& jumpDates,
+             const BSplineModel& bsplineModel) {
+            return new BSplineZeroCurve(referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel);
+        };
     }
     const std::vector<Date>& dates() const;
     const std::vector<Time>& times() const;
     #if !defined(SWIGR)
-    std::vector<std::pair<Date,Real> > nodes() const;
+        std::vector<std::pair<Date,Real> > nodes() const;
     #endif
     const Interpolation getInterpolation() const {
         return ext::make_shared<Interpolation>(interpolation_);
@@ -269,10 +276,8 @@ public:
     };
 };
 
-
 // global bootstrapper
 // hard-coded to linearly-interpolated, simply-compounded zero rates for now
-
 %{
 class AdditionalErrors {
     std::vector<ext::shared_ptr<RateHelper> > additionalHelpers_;
