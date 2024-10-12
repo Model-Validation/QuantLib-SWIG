@@ -326,15 +326,15 @@ class FdmLinearOp {
 };
 
 %{
-class SparseMatrix {
+class SparseMatrixFdm {
   public:
     std::vector<unsigned int> row_idx, col_idx;
     std::vector<Real> data;    
 };
 %}
 
-%shared_ptr(SparseMatrix)
-class SparseMatrix {
+%shared_ptr(SparseMatrixFdm)
+class SparseMatrixFdm {
   public:
     std::vector<unsigned int> row_idx, col_idx;
     std::vector<Real> data;    
@@ -352,9 +352,9 @@ class FdmLinearOpComposite : public FdmLinearOp {
     virtual Array preconditioner(const Array& r, Real s) const;
 
     %extend {
-        ext::shared_ptr<SparseMatrix> to_sparse_matrix() const {
+        ext::shared_ptr<SparseMatrixFdm> to_sparse_matrix() const {
             
-            ext::shared_ptr<SparseMatrix> a = ext::make_shared<SparseMatrix>();
+            ext::shared_ptr<SparseMatrixFdm> a = ext::make_shared<SparseMatrixFdm>();
             
             const QuantLib::SparseMatrix m = self->toMatrix(); 
             
