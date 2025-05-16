@@ -35,6 +35,7 @@
 %{
 using QuantLib::Pillar;
 using QuantLib::RateHelper;
+using QuantLib::NullRateHelper;
 using QuantLib::DepositRateHelper;
 using QuantLib::FraRateHelper;
 using QuantLib::FuturesRateHelper;
@@ -73,6 +74,14 @@ class RateHelper : public Observable {
     RateHelper();
 };
 
+%shared_ptr(NullRateHelper)
+class NullRateHelper : public RateHelper {
+  public:
+    NullRateHelper(
+      const Date pillarDate
+    );
+};
+
 %shared_ptr(DepositRateHelper)
 class DepositRateHelper : public RateHelper {
   public:
@@ -83,7 +92,9 @@ class DepositRateHelper : public RateHelper {
             const Calendar& calendar,
             BusinessDayConvention convention,
             bool endOfMonth,
-            const DayCounter& dayCounter);
+            const DayCounter& dayCounter,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date());
     DepositRateHelper(
             Rate rate,
             const Period& tenor,
@@ -91,11 +102,19 @@ class DepositRateHelper : public RateHelper {
             const Calendar& calendar,
             BusinessDayConvention convention,
             bool endOfMonth,
-            const DayCounter& dayCounter);
-    DepositRateHelper(const Handle<Quote>& rate,
-                         const ext::shared_ptr<IborIndex>& index);
-    DepositRateHelper(Rate rate,
-                         const ext::shared_ptr<IborIndex>& index);
+            const DayCounter& dayCounter,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date());
+    DepositRateHelper(
+            const Handle<Quote>& rate,
+            const ext::shared_ptr<IborIndex>& index,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date());
+    DepositRateHelper(
+            Rate rate,
+            const ext::shared_ptr<IborIndex>& index,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date());
 };
 
 %shared_ptr(FraRateHelper)
@@ -176,6 +195,8 @@ class FuturesRateHelper : public RateHelper {
             BusinessDayConvention convention,
             bool endOfMonth,
             const DayCounter& dayCounter,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date(),
             const Handle<Quote>& convexityAdjustment = Handle<Quote>(),
             Futures::Type type = Futures::IMM);
     FuturesRateHelper(
@@ -186,6 +207,8 @@ class FuturesRateHelper : public RateHelper {
             BusinessDayConvention convention,
             bool endOfMonth,
             const DayCounter& dayCounter,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date(),
             Rate convexityAdjustment = 0.0,
             Futures::Type type = Futures::IMM);
     FuturesRateHelper(
@@ -193,6 +216,8 @@ class FuturesRateHelper : public RateHelper {
             const Date& iborStartDate,
             const Date& iborEndDate,
             const DayCounter& dayCounter,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date(),
             const Handle<Quote>& convexityAdjustment = Handle<Quote>(),
             Futures::Type type = Futures::IMM);
     FuturesRateHelper(
@@ -200,20 +225,27 @@ class FuturesRateHelper : public RateHelper {
             const Date& iborStartDate,
             const Date& iborEndDate,
             const DayCounter& dayCounter,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date(),
             Rate convexityAdjustment = 0.0,
             Futures::Type type = Futures::IMM);
     FuturesRateHelper(
             const Handle<Quote>& price,
             const Date& iborStartDate,
             const ext::shared_ptr<IborIndex>& index,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date(),
             const Handle<Quote>& convexityAdjustment = Handle<Quote>(),
             Futures::Type type = Futures::IMM);
     FuturesRateHelper(
             Real price,
             const Date& iborStartDate,
             const ext::shared_ptr<IborIndex>& index,
+            Pillar::Choice pillar = Pillar::LastRelevantDate,
+            Date customPillarDate = Date(),
             Real convexityAdjustment = 0.0,
             Futures::Type type = Futures::IMM);
+    Real convexityAdjustment() const;
 };
 
 %shared_ptr(SwapRateHelper)
@@ -365,6 +397,7 @@ class DatedOISRateHelper : public RateHelper {
             Natural lookbackDays = Null<Natural>(),
             Natural lockoutDays = 0,
             bool applyObservationShift = false);
+    ext::shared_ptr<OvernightIndexedSwap> swap();
 };
 
 %shared_ptr(FxSwapRateHelper)
