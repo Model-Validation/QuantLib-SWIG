@@ -1,4 +1,3 @@
-
 /*
  Copyright (C) 2000, 2001, 2002, 2003 RiskMap srl
  Copyright (C) 2002, 2003 Ferdinando Ametrano
@@ -23,6 +22,7 @@
 #ifndef quantlib_interpolation_i
 #define quantlib_interpolation_i
 
+%include termstructures.i
 %include linearalgebra.i
 %include optimizers.i
 
@@ -92,6 +92,10 @@ using QuantLib::SpreadedInterpolation;
 using QuantLib::Linear;
 %}
 
+namespace std {
+    %template(ConstraintTypeVector) std::vector<SplineConstraints::ConstraintType>;
+}
+
 // Expose the SplineConstraints class
 %shared_ptr(SplineConstraints);
 class SplineConstraints {
@@ -107,12 +111,24 @@ public:
                         const std::vector<std::vector<Real>>& A = {},
                         const std::vector<Real>& b = {},
                         const std::vector<Real>& c = {},
-                        const std::vector<ConstraintType>& constraintTypes = {});
+                        const std::vector<ConstraintType>& constraintTypes = {},
+                        bool fitData = false);
+
+    Integer get_num_variables() const;
+    Integer get_num_constraints() const;
+    Integer get_num_parameters() const;
+
+    std::vector<std::vector<Real>> get_p_matrix() const;
+    std::vector<std::vector<Real>> get_a_matrix() const;
+
+    std::vector<Real> get_b_vector() const;
+    std::vector<Real> get_c_vector() const;
+    std::vector<Real> get_parameters() const;
+    std::vector<ConstraintType> get_constraint_types() const;
 };
 
 // Expose the BSplineSegment class
 %shared_ptr(BSplineSegment);
-
 class BSplineSegment {
 public:
     enum class Side {
@@ -136,7 +152,10 @@ public:
       Default,
       Log,
       Exp,
-      RateTime
+      RateTime,
+      RateTimeAnnualToContinuous,
+      ContinuousToAnnual,
+      ContinuousToSimple
     };
 
     BSplineSegment(
@@ -148,6 +167,31 @@ public:
         QuantLib::BSplineSegment::Side side = QuantLib::BSplineSegment::Side::Right,
         Size requiredPoints = 1,
         bool isGlobal = true);
+
+    std::pair<Real, Real> range() const;
+    std::vector<Real> knots() const;
+    Size degree() const;
+    std::vector<Real> evaluate_all(Real x, Integer degree, Side side) const;
+    Real value(const std::vector<Real>& coefficients, Real t, Integer nu, Side side);
+    std::vector<Real> value_functional(Real t, Side side) const;
+    std::vector<Real> derivative_functional(Real t, Integer nu = 1, Integer degree = -1, Real x0 = 0.0, Side side = Side::None) const;
+    std::vector<std::vector<Real>> derivative_matrix(Integer nu = 1, Integer degree = -1, bool differenceOperator = false) const;
+    std::vector<std::vector<Real>> anti_derivative_matrix(Integer nu = -1, Integer degree = -1,
+                                                         const std::vector<Real> t0 = {},
+                                                         bool differenceOperator = false) const;
+    std::vector<std::vector<Real>> single_derivative_matrix(Integer degree = -1, bool differenceOperator = false) const;
+    std::vector<std::vector<Real>> single_anti_derivative_matrix(Integer degree = -1, Real t0 = 0.0, bool differenceOperator = false) const;
+
+    std::vector<Real> get_simple_knots() const;
+    std::vector<Integer> get_knot_indices() const;
+    Natural get_num_variables() const;
+
+    InterpolationTransform interpolationTransform() const;
+    InterpolationSmoothness interpolationSmoothness() const;
+    Side side() const;
+    std::string interpolation_transform() const;
+    std::string interpolation_smoothness() const;
+    std::string side_str() const;
 };
 
 namespace std {
@@ -157,10 +201,29 @@ namespace std {
 // Expose the BSplineStructure class
 %shared_ptr(BSplineStructure);
 class BSplineStructure {
-public:
+  public:
     BSplineStructure(
             const std::vector<ext::shared_ptr<BSplineSegment>>& splineSegments,
-            const ext::shared_ptr<SplineConstraints>& splineConstraints);
+            const ext::shared_ptr<SplineConstraints>& splineConstraints,
+            bool useSegmentNodes = false, bool rejectZeroNode = true);
+
+    std::vector<Real> evaluate_all(Real x, BSplineSegment::Side side = BSplineSegment::Side::Right) const;
+    Real value(const std::vector<Real>& coefficients, Real x, Integer nu=0, BSplineSegment::Side side=BSplineSegment::Side::Right) const;
+
+    std::vector<Real> transform(const std::vector<Real>& abscissae, const std::vector<Real>& values, BSplineSegment::Side side=BSplineSegment::Side::Right) const;
+    std::pair<Real, Real> range() const;
+
+    Integer get_num_variables() const;
+
+    std::vector<std::vector<Real>> get_interpolation_a() const;
+    std::vector<Real> get_interpolation_b() const;
+
+    void setConstraints(const ext::shared_ptr<SplineConstraints>& splineConstraints);
+    ext::shared_ptr<SplineConstraints> getConstraints() const;
+    std::vector<Real> solve_swig(const std::vector<Real>& parameters) const;
+    std::vector<Real> interpolate_swig(const std::vector<Real>& x, const std::vector<Real>& y);
+    std::vector<ext::shared_ptr<BSplineSegment>> get_spline_segments() const;
+
 };
 
 // Expose the BSplineModel class
@@ -168,49 +231,82 @@ public:
 class BSplineModel {
 public:
     BSplineModel(ext::shared_ptr<BSplineStructure>& splineStructure);
+
+    ext::shared_ptr<BSplineInterpolation> interpolate(const std::vector<Real>& x, const std::vector<Real> y) const;
+    Real getStartPoint() const;
+    Real getEndPoint() const;
+    ext::shared_ptr<BSplineStructure> get_structure() const;
+};
+
+// Expose the Interpolation class, but without constructor
+%shared_ptr(Interpolation)
+class Interpolation {
+  public:
+    Real operator()(Real x, bool allowExtrapolation = false) const;
+    Real primitive(Real x, bool allowExtrapolation = false) const;
+    Real derivative(Real x, bool allowExtrapolation = false) const;
+    Real secondDerivative(Real x, bool allowExtrapolation = false) const;
+    Real xMin() const;
+    Real xMax() const;
+    bool isInRange(Real x) const;
+    void update();
 };
 
 // Expose the BSplineInterpolation class
-// %shared_ptr(BSplineInterpolation);
-// class BSplineInterpolation {
-// public:
-//     BSplineInterpolation(
-//       const std::vector<Time>& x, 
-//       const std::vector<Real>& y, 
-//       const ext::shared_ptr<BSplineSegment>& splineStructure
-//     );
+%shared_ptr(BSplineInterpolation);
+class BSplineInterpolation : public Interpolation {
+public:
+    BSplineInterpolation(
+      const std::vector<Time>& x, 
+      const std::vector<Real>& y, 
+      const ext::shared_ptr<BSplineStructure>& splineStructure
+    );
+    Real operator()(Real x, bool allowExtrapolation = false) const;
+    Real primitive(Real x, bool allowExtrapolation = false) const;
+    Real derivative(Real x, bool allowExtrapolation = false) const;
+    Real secondDerivative(Real x, bool allowExtrapolation = false) const;
+    Real xMin() const;
+    Real xMax() const;
+    bool isInRange(Real x) const;
+    void update();
 
-
-//     Real operator()(Real x, bool allowExtrapolation = false);
-//     Real derivative(Real x, bool allowExtrapolation = false);
-// };
-
-%{
-// safe versions which copy their arguments
-class SafeBSplineInterpolation {
-  public:
-    SafeBSplineInterpolation(const std::vector<Time>& x, 
-      const std::vector<Real>& y,  const ext::shared_ptr<BSplineStructure>& splineStructure)
-    : x_(x), y_(y), f_(x_.begin(), x_.end(), y_.begin(), splineStructure) {}
-    Real operator()(Real x, bool allowExtrapolation=false) {
-        return f_(x, allowExtrapolation);
-    }
-    std::vector<Time> x_; 
-    std::vector<Real> y_;
-    BSplineInterpolation f_;
+    ext::shared_ptr<BSplineStructure> get_structure() const;
+    std::vector<Real> get_coefficients() const;
 };
+
+%inline %{
+    ext::shared_ptr<BSplineInterpolation> as_bspline_interpolation(const ext::shared_ptr<Interpolation>& ip) {
+        return ext::dynamic_pointer_cast<BSplineInterpolation>(ip);
+    }
 %}
 
-%rename(BSplineInterpolation) SafeBSplineInterpolation;
-class SafeBSplineInterpolation {
-    #if defined(SWIGCSHARP)
-    %rename(call) operator();
-    #endif
-  public:
-    SafeBSplineInterpolation(const std::vector<Time>& x, 
-      const std::vector<Real>& y, const ext::shared_ptr<BSplineStructure>& splineStructure);
-    Real operator()(Real x, bool allowExtrapolation=false);
-};
+
+// %{
+// // safe versions which copy their arguments
+// class SafeBSplineInterpolation {
+//   public:
+//     SafeBSplineInterpolation(const std::vector<Time>& x, 
+//       const std::vector<Real>& y,  const ext::shared_ptr<BSplineStructure>& splineStructure)
+//     : x_(x), y_(y), f_(x_.begin(), x_.end(), y_.begin(), splineStructure) {}
+//     Real operator()(Real x, bool allowExtrapolation=false) {
+//         return f_(x, allowExtrapolation);
+//     }
+//     std::vector<Time> x_; 
+//     std::vector<Real> y_;
+//     BSplineInterpolation f_;
+// };
+// %}
+
+// %rename(BSplineInterpolation) SafeBSplineInterpolation;
+// class SafeBSplineInterpolation {
+//     #if defined(SWIGCSHARP)
+//     %rename(call) operator();
+//     #endif
+//   public:
+//     SafeBSplineInterpolation(const std::vector<Time>& x, 
+//       const std::vector<Real>& y, const ext::shared_ptr<BSplineStructure>& splineStructure);
+//     Real operator()(Real x, bool allowExtrapolation=false);
+// };
 
 // %extend SafeBSplineInterpolation {
 //     Real derivative(Real x, bool extrapolate = false) {
@@ -225,51 +321,67 @@ class SafeBSplineInterpolation {
 // };
 
 // Expose the SpreadedInterpolationModel class
-%shared_ptr(SpreadedInterpolationModel<Linear>);
-%shared_ptr(SpreadedInterpolationModel<BSplineModel>);
+// %shared_ptr(SpreadedInterpolationModel);
+%shared_ptr(SpreadedInterpolationModel<ZeroYield, Linear>);
+%shared_ptr(SpreadedInterpolationModel<ZeroYield, BSplineModel>);
+%shared_ptr(SpreadedInterpolationModel<TermForwardRate, BSplineModel>);
 
-template <class Interpolator>
+template <class Traits, class Interpolator>
 class SpreadedInterpolationModel {
-public:
-    SpreadedInterpolationModel(Interpolator& factory, ext::shared_ptr<Interpolation>& baseCurve);
+  public:
+      // SpreadedInterpolationModel(Interpolator& factory, const ext::shared_ptr<YieldTermStructure>& baseCurve,
+      //   const std::optional<ext::shared_ptr<InterestRateIndex>>& index = std::nullopt);
+
+      %extend{
+        SpreadedInterpolationModel(Interpolator& factory, const ext::shared_ptr<YieldTermStructure>& baseCurve,
+          const ext::shared_ptr<InterestRateIndex>& index) {
+          return new SpreadedInterpolationModel<Traits, Interpolator>(factory, baseCurve, index);
+        }
+
+        SpreadedInterpolationModel(Interpolator& factory, const ext::shared_ptr<YieldTermStructure>& baseCurve) {
+          return new SpreadedInterpolationModel<Traits, Interpolator>(factory, baseCurve, std::nullopt);
+        }
+      };
 };
 
-%template(SpreadedLinearModel) SpreadedInterpolationModel<Linear>;
-%template(SpreadedSplineModel) SpreadedInterpolationModel<BSplineModel>;
+%template(SpreadedZeroLinearModel) SpreadedInterpolationModel<ZeroYield, Linear>;
+%template(SpreadedZeroBSplineModel) SpreadedInterpolationModel<ZeroYield, BSplineModel>;
+%template(SpreadedTermForwardBSplineModel) SpreadedInterpolationModel<TermForwardRate, BSplineModel>;
 
 %shared_ptr(Interpolation)
 
 // Expose the SpreadedInterpolation class
-%{
-// safe versions which copy their arguments
-class SafeSpreadedInterpolation {
-  public:
-    template <class Interpolator>
-    SafeSpreadedInterpolation(const std::vector<Time>& x, 
-      const std::vector<Real>& y,  Interpolator& factory, ext::shared_ptr<Interpolation>& baseCurve)
-    : x_(x), y_(y), f_(x_.begin(), x_.end(), y_.begin(), factory, baseCurve) {}
-    Real operator()(Real x, bool allowExtrapolation=false) {
-        return f_(x, allowExtrapolation);
-    }
-    std::vector<Time> x_; 
-    std::vector<Real> y_;
-    SpreadedInterpolation f_;
-};
-%}
+// %{
+// // safe versions which copy their arguments
+// class SafeSpreadedInterpolation {
+//   public:
+//     template <class Traits, class Interpolator>
+//     SafeSpreadedInterpolation(const std::vector<Time>& x, 
+//       const std::vector<Real>& y,  Interpolator& factory, ext::shared_ptr<YieldTermStructure>& baseCurve)
+//     : x_(x), y_(y), f_(x_.begin(), x_.end(), y_.begin(), factory, baseCurve) {}
+//     Real operator()(Real x, bool allowExtrapolation=false) {
+//         return f_(x, allowExtrapolation);
+//     }
+//     std::vector<Time> x_; 
+//     std::vector<Real> y_;
+//     SpreadedInterpolation f_;
+// };
+// %}
 
-// %rename(LinearSpreadedInterpolation) SafeLinearSpreadedInterpolation;
-// %rename(SplineSpreadedInterpolation) SafeSplineSpreadedInterpolation;
+// // %rename(LinearSpreadedInterpolation) SafeLinearSpreadedInterpolation;
+// // %rename(SplineSpreadedInterpolation) SafeSplineSpreadedInterpolation;
 
-class SafeSpreadedInterpolation {
-  public:
-    template <class Interpolator>
-    SafeSpreadedInterpolation(const std::vector<Time>& x, 
-      const std::vector<Real>& y,  Interpolator& factory, ext::shared_ptr<Interpolation>& baseCurve);
-    Real operator()(Real x, bool allowExtrapolation=false);
+// class SafeSpreadedInterpolation {
+//   public:
+//     template <class Traits, class Interpolator>
+//     SafeSpreadedInterpolation(const std::vector<Time>& x, 
+//       const std::vector<Real>& y,  Interpolator& factory, ext::shared_ptr<YieldTermStructure>& baseCurve);
+//     Real operator()(Real x, bool allowExtrapolation=false);
 
-    %template(LinearSpreadedInterpolation) SafeSpreadedInterpolation<Linear>;
-    %template(SplineSpreadedInterpolation) SafeSpreadedInterpolation<BSplineModel>;
-};
+//     %template(LinearZeroSpreadedInterpolation) SafeSpreadedInterpolation<ZeroYield, Linear>;
+//     %template(BSplineZeroSpreadedInterpolation) SafeSpreadedInterpolation<ZeroYield, BSplineModel>;
+//     %template(BSplineTermForwardSpreadedInterpolation) SafeSpreadedInterpolation<TermForwardRate, BSplineModel>;
+// };
 
 
 // class SafeLinearSpreadedInterpolation {

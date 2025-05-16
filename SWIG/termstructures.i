@@ -77,11 +77,25 @@ class YieldTermStructure : public TermStructure {
                           bool extrapolate = false) const;
     InterestRate forwardRate(const Date& d1, const Date& d2,
                              const DayCounter&, Compounding,
-                             Frequency f = Annual,
+                             Frequency f = NoFrequency,
+                             bool extrapolate = false) const;
+    InterestRate forwardRate(const Date& d, const Period& p,
+                             const DayCounter&, Compounding,
+                             Frequency f = NoFrequency,
                              bool extrapolate = false) const;
     InterestRate forwardRate(Time t1, Time t2,
                              Compounding, Frequency f = Annual,
                              bool extrapolate = false) const;
+
+    InterestRate termForwardRate(Time t, bool extrapolate = false) const;
+
+    InterestRate termForwardRate(Date date, bool extrapolate = false) const;
+
+    InterestRate termForwardRate(Date date,
+                                        const DayCounter& resultDayCounter,
+                                        Compounding resultCompounding = Simple,
+                                        Frequency resultFrequency = NoFrequency,
+                                        bool extrapolate = false) const;
 };
 
 %template(YieldTermStructureHandle) Handle<YieldTermStructure>;

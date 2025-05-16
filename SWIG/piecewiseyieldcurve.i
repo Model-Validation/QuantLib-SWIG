@@ -51,6 +51,7 @@ struct RateTime {};
 using QuantLib::PiecewiseYieldCurve;
 using QuantLib::Interpolation;
 using QuantLib::BSplineModel;
+using QuantLib::BSplineInterpolation;
 using QuantLib::BSplineStructure;
 using QuantLib::SplineConstraints;
 %}
@@ -77,6 +78,46 @@ struct _IterativeBootstrap {
       maxEvaluations(maxEvaluations) {}
 };
 
+// global bootstrapper
+class AdditionalErrors {
+    std::vector<ext::shared_ptr<RateHelper> > additionalHelpers_;
+  public:
+    AdditionalErrors(const std::vector<ext::shared_ptr<RateHelper> >& additionalHelpers)
+    : additionalHelpers_(additionalHelpers) {}
+    Array operator()() const {
+        Array errors(additionalHelpers_.size() - 2);
+        Real a = additionalHelpers_.front()->impliedQuote();
+        Real b = additionalHelpers_.back()->impliedQuote();
+        for (Size k = 0; k < errors.size(); ++k) {
+            errors[k] = (static_cast<Real>(errors.size()-k) * a + static_cast<Real>(1+k) * b) / static_cast<Real>(errors.size()+1)
+                - additionalHelpers_.at(1+k)->impliedQuote();
+        }
+        return errors;
+    }
+};
+
+class AdditionalDates {
+    std::vector<Date> additionalDates_;
+  public:
+    AdditionalDates(const std::vector<Date>& additionalDates)
+    : additionalDates_(additionalDates) {}
+    std::vector<Date> operator()() const {
+        return additionalDates_;
+    }
+};
+
+struct _GlobalBootstrap {
+    std::vector<ext::shared_ptr<RateHelper> > additionalHelpers;
+    std::vector<Date> additionalDates;
+    double accuracy;
+    _GlobalBootstrap(double accuracy = Null<double>())
+    : accuracy(accuracy) {}
+   _GlobalBootstrap(const std::vector<ext::shared_ptr<RateHelper> >& additionalHelpers,
+                     const std::vector<Date>& additionalDates,
+                     double accuracy = Null<double>())
+    : additionalHelpers(additionalHelpers), additionalDates(additionalDates), accuracy(accuracy) {}
+};
+
 template <class PiecewiseYieldCurve>
 inline typename PiecewiseYieldCurve::bootstrap_type make_bootstrap(const _IterativeBootstrap& b) {
     return {
@@ -87,6 +128,14 @@ inline typename PiecewiseYieldCurve::bootstrap_type make_bootstrap(const _Iterat
     };
 }
 %}
+
+%rename(GlobalBootstrap) _GlobalBootstrap;
+struct _GlobalBootstrap {
+    _GlobalBootstrap(doubleOrNull accuracy = Null<double>());
+    _GlobalBootstrap(const std::vector<ext::shared_ptr<RateHelper> >& additionalHelpers,
+                     const std::vector<Date>& additionalDates,
+                     doubleOrNull accuracy = Null<double>());
+};
 
 %rename(IterativeBootstrap) _IterativeBootstrap;
 struct _IterativeBootstrap {
@@ -108,6 +157,7 @@ struct _IterativeBootstrap {
    can't take class templates with two or more template arguments. */
 
 %define export_piecewise_curve(Name,Traits,Interpolator)
+
 
 %{
 typedef PiecewiseYieldCurve<Traits, Interpolator> Name;
@@ -175,6 +225,8 @@ class Name : public YieldTermStructure {
 export_piecewise_curve(PiecewiseFlatForward,ForwardRate,BackwardFlat);
 export_piecewise_curve(PiecewiseLogLinearDiscount,Discount,LogLinear);
 export_piecewise_curve(PiecewiseLinearForward,ForwardRate,Linear);
+// export_piecewise_curve(PiecewiseLinearTermForward,TermForwardRate,Linear);
+// export_piecewise_curve(PiecewiseLinearInstantaneousForward,InstantaneousForwardRate,Linear);
 export_piecewise_curve(PiecewiseLinearZero,ZeroYield,Linear);
 export_piecewise_curve(PiecewiseLinearRateTime,RateTime,Linear);
 export_piecewise_curve(PiecewiseRateTimeLinearZero,ZeroYield,RateTimeLinear);
@@ -194,28 +246,146 @@ export_piecewise_curve(PiecewiseMonotonicParabolicCubicZero,ZeroYield,MonotonicP
 export_piecewise_curve(PiecewiseLogParabolicCubicDiscount,Discount,LogParabolicCubic);
 export_piecewise_curve(PiecewiseMonotonicLogParabolicCubicDiscount,Discount,MonotonicLogParabolicCubic);
 
-// Expose the BSplineZeroCurve type
+// Expose the PiecewiseBSpline*Curve types
 %{
-typedef PiecewiseYieldCurve<ZeroYield, BSplineModel> BSplineZeroCurve;
+typedef PiecewiseYieldCurve<ZeroYield, BSplineModel> PiecewiseBSplineZeroCurve;
+typedef PiecewiseYieldCurve<ZeroYield, BSplineModel, GlobalBootstrap> GlobalPiecewiseBSplineZeroCurve;
+typedef PiecewiseYieldCurve<ForwardRate, BSplineModel> PiecewiseBSplineForwardCurve;
+typedef PiecewiseYieldCurve<ForwardRate, BSplineModel, GlobalBootstrap> GlobalPiecewiseBSplineForwardCurve;
+typedef PiecewiseYieldCurve<TermForwardRate, BSplineModel> PiecewiseBSplineTermForwardCurve;
+typedef PiecewiseYieldCurve<TermForwardRate, BSplineModel, GlobalBootstrap> GlobalPiecewiseBSplineTermForwardCurve;
+typedef PiecewiseYieldCurve<InstantaneousForwardRate, BSplineModel> PiecewiseBSplineInstantaneousForwardCurve;
+typedef PiecewiseYieldCurve<InstantaneousForwardRate, BSplineModel, GlobalBootstrap> GlobalPiecewiseBSplineInstantaneousForwardCurve;
 %}
 
-%shared_ptr(BSplineZeroCurve);
-class BSplineZeroCurve : public YieldTermStructure {
+%shared_ptr(PiecewiseBSplineZeroCurve);
+class PiecewiseBSplineZeroCurve : public YieldTermStructure {
 public:
     %extend {
-        BSplineZeroCurve(const Date& referenceDate,
+        PiecewiseBSplineZeroCurve(const Date& referenceDate,
                          const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
                          const DayCounter& dayCounter,
-                         const BSplineModel& bsplineModel) {
-            return new BSplineZeroCurve(referenceDate, rateHelpers, dayCounter, bsplineModel);
+                         const BSplineModel& bsplineModel,
+                         const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineZeroCurve(referenceDate, rateHelpers, dayCounter, bsplineModel, make_bootstrap<PiecewiseBSplineZeroCurve>(b));
         };
-        BSplineZeroCurve(const Date& referenceDate,
+        PiecewiseBSplineZeroCurve(const Date& referenceDate,
              const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
              const DayCounter& dayCounter,
              const std::vector<Handle<Quote> >& jumps,
              const std::vector<Date>& jumpDates,
-             const BSplineModel& bsplineModel) {
-            return new BSplineZeroCurve(referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel);
+             const BSplineModel& bsplineModel,
+             const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineZeroCurve(referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel, make_bootstrap<PiecewiseBSplineZeroCurve>(b));
+        };
+        PiecewiseBSplineZeroCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const ext::shared_ptr<IborIndex>& index,
+                         const BSplineModel& bsplineModel,
+                         const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineZeroCurve(referenceDate, rateHelpers, index, bsplineModel, make_bootstrap<PiecewiseBSplineZeroCurve>(b));
+        };
+        PiecewiseBSplineZeroCurve(const Date& referenceDate,
+             const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const ext::shared_ptr<IborIndex>& index,
+             const std::vector<Handle<Quote> >& jumps,
+             const std::vector<Date>& jumpDates,
+             const BSplineModel& bsplineModel,
+             const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineZeroCurve(referenceDate, rateHelpers, index, jumps, jumpDates, bsplineModel, make_bootstrap<PiecewiseBSplineZeroCurve>(b));
+        };
+    }
+
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+        std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const override {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+
+%shared_ptr(GlobalPiecewiseBSplineZeroCurve);
+class GlobalPiecewiseBSplineZeroCurve : public YieldTermStructure {
+public:
+    %extend {
+        GlobalPiecewiseBSplineZeroCurve(const Date& referenceDate,
+                        const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const DayCounter& dayCounter,
+                        const BSplineModel& bsplineModel,
+                        const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+                return new GlobalPiecewiseBSplineZeroCurve(
+                    referenceDate, rateHelpers, dayCounter, bsplineModel,
+                    GlobalPiecewiseBSplineZeroCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineZeroCurve(
+                    referenceDate, rateHelpers, dayCounter, bsplineModel,
+                    GlobalPiecewiseBSplineZeroCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
+        };
+        GlobalPiecewiseBSplineZeroCurve(const Date& referenceDate,
+            const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+            const DayCounter& dayCounter,
+            const std::vector<Handle<Quote> >& jumps,
+            const std::vector<Date>& jumpDates,
+            const BSplineModel& bsplineModel,
+            const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+            return new GlobalPiecewiseBSplineZeroCurve(
+                    referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineZeroCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineZeroCurve(
+                    referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineZeroCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
+        };
+        GlobalPiecewiseBSplineZeroCurve(const Date& referenceDate,
+                        const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const ext::shared_ptr<IborIndex>& index,
+                        const BSplineModel& bsplineModel,
+                        const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+                return new GlobalPiecewiseBSplineZeroCurve(
+                    referenceDate, rateHelpers, index, bsplineModel,
+                    GlobalPiecewiseBSplineZeroCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineZeroCurve(
+                    referenceDate, rateHelpers, index, bsplineModel,
+                    GlobalPiecewiseBSplineZeroCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
+        };
+        GlobalPiecewiseBSplineZeroCurve(const Date& referenceDate,
+                        const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const ext::shared_ptr<IborIndex>& index,
+                        const std::vector<Handle<Quote> >& jumps,
+                        const std::vector<Date>& jumpDates,
+                        const BSplineModel& bsplineModel,
+                        const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+                return new GlobalPiecewiseBSplineZeroCurve(
+                    referenceDate, rateHelpers, index, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineZeroCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineZeroCurve(
+                    referenceDate, rateHelpers, index, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineZeroCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
         };
     }
     const std::vector<Date>& dates() const;
@@ -228,21 +398,272 @@ public:
     };
 };
 
-// Expose the BSplineZeroCurve type
-%{
-typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<Linear> > LinearSpreadCurve;
-typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<BSplineModel> > BSplineSpreadCurve;
-%}
-
-%shared_ptr(LinearSpreadCurve);
-class LinearSpreadCurve : public YieldTermStructure {
+%shared_ptr(PiecewiseBSplineForwardCurve);
+class PiecewiseBSplineForwardCurve : public YieldTermStructure {
 public:
     %extend {
-        LinearSpreadCurve(const Date& settlementDate,
+        PiecewiseBSplineForwardCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                         const DayCounter& dayCounter,
+                         const BSplineModel& bsplineModel,
+                         const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineForwardCurve(referenceDate, rateHelpers, dayCounter, bsplineModel, make_bootstrap<PiecewiseBSplineForwardCurve>(b));
+        };
+        PiecewiseBSplineForwardCurve(const Date& referenceDate,
+             const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+             const DayCounter& dayCounter,
+             const std::vector<Handle<Quote> >& jumps,
+             const std::vector<Date>& jumpDates,
+             const BSplineModel& bsplineModel,
+             const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineForwardCurve(referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel, make_bootstrap<PiecewiseBSplineForwardCurve>(b));
+        };
+        PiecewiseBSplineForwardCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                         const ext::shared_ptr<IborIndex>& index,
+                         const BSplineModel& bsplineModel,
+                         const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineForwardCurve(referenceDate, rateHelpers, index, bsplineModel, make_bootstrap<PiecewiseBSplineForwardCurve>(b));
+        };
+        PiecewiseBSplineForwardCurve(const Date& referenceDate,
+             const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+             const ext::shared_ptr<IborIndex>& index,
+             const std::vector<Handle<Quote> >& jumps,
+             const std::vector<Date>& jumpDates,
+             const BSplineModel& bsplineModel,
+             const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineForwardCurve(referenceDate, rateHelpers, index, jumps, jumpDates, bsplineModel, make_bootstrap<PiecewiseBSplineForwardCurve>(b));
+        };
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+        std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+%shared_ptr(GlobalPiecewiseBSplineForwardCurve);
+class GlobalPiecewiseBSplineForwardCurve : public YieldTermStructure {
+public:
+    %extend {
+        GlobalPiecewiseBSplineForwardCurve(const Date& referenceDate,
+                        const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const DayCounter& dayCounter,
+                        const BSplineModel& bsplineModel,
+                        const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+                return new GlobalPiecewiseBSplineForwardCurve(
+                    referenceDate, rateHelpers, dayCounter, bsplineModel,
+                    GlobalPiecewiseBSplineForwardCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineForwardCurve(
+                    referenceDate, rateHelpers, dayCounter, bsplineModel,
+                    GlobalPiecewiseBSplineForwardCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
+        };
+        GlobalPiecewiseBSplineForwardCurve(const Date& referenceDate,
+            const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+            const DayCounter& dayCounter,
+            const std::vector<Handle<Quote> >& jumps,
+            const std::vector<Date>& jumpDates,
+            const BSplineModel& bsplineModel,
+            const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+            return new GlobalPiecewiseBSplineForwardCurve(
+                    referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineForwardCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineForwardCurve(
+                    referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineForwardCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
+        };
+        GlobalPiecewiseBSplineForwardCurve(const Date& referenceDate,
+                        const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const ext::shared_ptr<IborIndex>& index,
+                        const BSplineModel& bsplineModel,
+                        const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+                return new GlobalPiecewiseBSplineForwardCurve(
+                    referenceDate, rateHelpers, index, bsplineModel,
+                    GlobalPiecewiseBSplineForwardCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineForwardCurve(
+                    referenceDate, rateHelpers, index, bsplineModel,
+                    GlobalPiecewiseBSplineForwardCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
+        };
+        GlobalPiecewiseBSplineForwardCurve(const Date& referenceDate,
+            const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+            const ext::shared_ptr<IborIndex>& index,
+            const std::vector<Handle<Quote> >& jumps,
+            const std::vector<Date>& jumpDates,
+            const BSplineModel& bsplineModel,
+            const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+            return new GlobalPiecewiseBSplineForwardCurve(
+                    referenceDate, rateHelpers, index, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineForwardCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineForwardCurve(
+                    referenceDate, rateHelpers, index, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineForwardCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
+        };
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+        std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+%shared_ptr(PiecewiseBSplineTermForwardCurve);
+class PiecewiseBSplineTermForwardCurve : public YieldTermStructure {
+public:
+    %extend {
+        PiecewiseBSplineTermForwardCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                         const ext::shared_ptr<IborIndex>& index,
+                         const BSplineModel& bsplineModel,
+                         const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineTermForwardCurve(referenceDate, rateHelpers, index, bsplineModel, make_bootstrap<PiecewiseBSplineTermForwardCurve>(b));
+        };
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+        std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+%shared_ptr(GlobalPiecewiseBSplineTermForwardCurve);
+class GlobalPiecewiseBSplineTermForwardCurve : public YieldTermStructure {
+public:
+    %extend {
+        GlobalPiecewiseBSplineTermForwardCurve(const Date& referenceDate,
+                        const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const ext::shared_ptr<IborIndex>& index,
+                        const BSplineModel& bsplineModel,
+                        const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+                return new GlobalPiecewiseBSplineTermForwardCurve(
+                    referenceDate, rateHelpers, index, bsplineModel,
+                    GlobalPiecewiseBSplineTermForwardCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineTermForwardCurve(
+                    referenceDate, rateHelpers, index, bsplineModel,
+                    GlobalPiecewiseBSplineTermForwardCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
+        };
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+        std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+
+%shared_ptr(PiecewiseBSplineInstantaneousForwardCurve);
+class PiecewiseBSplineInstantaneousForwardCurve : public YieldTermStructure {
+public:
+    %extend {
+        PiecewiseBSplineInstantaneousForwardCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                         const DayCounter& dayCounter,
+                         const BSplineModel& bsplineModel,
+                         const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineInstantaneousForwardCurve(referenceDate, rateHelpers, dayCounter, bsplineModel, make_bootstrap<PiecewiseBSplineInstantaneousForwardCurve>(b));
+        };
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+        std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+%shared_ptr(GlobalPiecewiseBSplineInstantaneousForwardCurve);
+class GlobalPiecewiseBSplineInstantaneousForwardCurve : public YieldTermStructure {
+public:
+    %extend {
+        GlobalPiecewiseBSplineInstantaneousForwardCurve(const Date& referenceDate,
+                        const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const DayCounter& dayCounter,
+                        const BSplineModel& bsplineModel,
+                        const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+                return new GlobalPiecewiseBSplineInstantaneousForwardCurve(
+                    referenceDate, rateHelpers, dayCounter, bsplineModel,
+                    GlobalPiecewiseBSplineInstantaneousForwardCurve::bootstrap_type(b.accuracy));
+            } else {
+                return new GlobalPiecewiseBSplineInstantaneousForwardCurve(
+                    referenceDate, rateHelpers, dayCounter, bsplineModel,
+                    GlobalPiecewiseBSplineInstantaneousForwardCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy));
+            }
+        };
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+        std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+// Expose the spread curve types
+%{
+typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<ZeroYield, Linear> > SpreadLinearZeroCurve;
+typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<ZeroYield, BSplineModel> > SpreadBSplineZeroCurve;
+typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<ZeroYield, BSplineModel>, GlobalBootstrap > GlobalSpreadBSplineZeroCurve;
+typedef PiecewiseYieldCurve<TermForwardRate, SpreadedInterpolationModel<TermForwardRate, BSplineModel>, GlobalBootstrap > GlobalSpreadBSplineTermForwardCurve;
+%}
+
+%shared_ptr(SpreadLinearZeroCurve);
+class SpreadLinearZeroCurve : public YieldTermStructure {
+public:
+    %extend {
+        SpreadLinearZeroCurve(const Date& referenceDate,
                          const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
                          const DayCounter& dayCounter,
-                         const SpreadedInterpolationModel<Linear>& spreadModel) {
-            return new LinearSpreadCurve(settlementDate, rateHelpers, dayCounter, spreadModel);
+                         const SpreadedInterpolationModel<ZeroYield, Linear>& spreadModel) {
+            return new SpreadLinearZeroCurve(referenceDate, rateHelpers, dayCounter, spreadModel);
         }
     }
     const std::vector<Date>& dates() const;
@@ -255,15 +676,15 @@ public:
     };
 };
 
-%shared_ptr(BSplineSpreadCurve);
-class BSplineSpreadCurve : public YieldTermStructure {
+%shared_ptr(SpreadBSplineZeroCurve);
+class SpreadBSplineZeroCurve : public YieldTermStructure {
 public:
     %extend {
-        BSplineSpreadCurve(const Date& settlementDate,
+        SpreadBSplineZeroCurve(const Date& referenceDate,
                          const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
                          const DayCounter& dayCounter,
-                         const SpreadedInterpolationModel<BSplineModel>& spreadModel) {
-            return new BSplineSpreadCurve(settlementDate, rateHelpers, dayCounter, spreadModel);
+                         const SpreadedInterpolationModel<ZeroYield, BSplineModel>& spreadModel) {
+            return new SpreadBSplineZeroCurve(referenceDate, rateHelpers, dayCounter, spreadModel);
         }
     }
     const std::vector<Date>& dates() const;
@@ -276,55 +697,46 @@ public:
     };
 };
 
-// global bootstrapper
-// hard-coded to linearly-interpolated, simply-compounded zero rates for now
-%{
-class AdditionalErrors {
-    std::vector<ext::shared_ptr<RateHelper> > additionalHelpers_;
-  public:
-    AdditionalErrors(const std::vector<ext::shared_ptr<RateHelper> >& additionalHelpers)
-    : additionalHelpers_(additionalHelpers) {}
-    Array operator()() const {
-        Array errors(additionalHelpers_.size() - 2);
-        Real a = additionalHelpers_.front()->impliedQuote();
-        Real b = additionalHelpers_.back()->impliedQuote();
-        for (Size k = 0; k < errors.size(); ++k) {
-            errors[k] = (static_cast<Real>(errors.size()-k) * a + static_cast<Real>(1+k) * b) / static_cast<Real>(errors.size()+1)
-                - additionalHelpers_.at(1+k)->impliedQuote();
+%shared_ptr(GlobalSpreadBSplineZeroCurve);
+class GlobalSpreadBSplineZeroCurve : public YieldTermStructure {
+public:
+    %extend {
+        GlobalSpreadBSplineZeroCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
+                         const DayCounter& dayCounter,
+                         const SpreadedInterpolationModel<ZeroYield, BSplineModel>& spreadModel) {
+            return new GlobalSpreadBSplineZeroCurve(referenceDate, rateHelpers, dayCounter, spreadModel);
         }
-        return errors;
     }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
 };
 
-class AdditionalDates {
-    std::vector<Date> additionalDates_;
-  public:
-    AdditionalDates(const std::vector<Date>& additionalDates)
-    : additionalDates_(additionalDates) {}
-    std::vector<Date> operator()() const {
-        return additionalDates_;
+%shared_ptr(GlobalSpreadBSplineTermForwardCurve);
+class GlobalSpreadBSplineTermForwardCurve : public YieldTermStructure {
+public:
+    %extend {
+        GlobalSpreadBSplineTermForwardCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
+                         const ext::shared_ptr<IborIndex>& iborIndex,
+                         const SpreadedInterpolationModel<TermForwardRate, BSplineModel>& spreadModel) {
+            return new GlobalSpreadBSplineTermForwardCurve(referenceDate, rateHelpers, iborIndex, spreadModel);
+        }
     }
-};
-
-struct _GlobalBootstrap {
-    std::vector<ext::shared_ptr<RateHelper> > additionalHelpers;
-    std::vector<Date> additionalDates;
-    double accuracy;
-    _GlobalBootstrap(double accuracy = Null<double>())
-    : accuracy(accuracy) {}
-   _GlobalBootstrap(const std::vector<ext::shared_ptr<RateHelper> >& additionalHelpers,
-                     const std::vector<Date>& additionalDates,
-                     double accuracy = Null<double>())
-    : additionalHelpers(additionalHelpers), additionalDates(additionalDates), accuracy(accuracy) {}
-};
-%}
-
-%rename(GlobalBootstrap) _GlobalBootstrap;
-struct _GlobalBootstrap {
-    _GlobalBootstrap(doubleOrNull accuracy = Null<double>());
-    _GlobalBootstrap(const std::vector<ext::shared_ptr<RateHelper> >& additionalHelpers,
-                     const std::vector<Date>& additionalDates,
-                     doubleOrNull accuracy = Null<double>());
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
 };
 
 
