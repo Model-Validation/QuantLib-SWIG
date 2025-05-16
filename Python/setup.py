@@ -143,7 +143,7 @@ class my_build_ext(build_ext):
                             ('NDEBUG', None), ('_WINDOWS', None),
                             ('NOMINMAX', None)]
             extra_compile_args = ['/GR', '/FD', '/Zm250', '/EHsc', '/bigobj' ]
-            extra_link_args = ['/subsystem:windows', machinetype]
+            extra_link_args = ['/subsystem:windows', machinetype, 'scsdir-s.lib']
 
             if self.debug:
                 if self.static or 'QL_STATIC_RUNTIME' in os.environ:
@@ -224,7 +224,7 @@ classifiers = [
 ]
 
 setup(name             = "QuantLib",
-      version          = "1.35-dev",
+      version          = "1.35",
       description      = "Python bindings for the QuantLib library",
       long_description = """
 QuantLib (https://www.quantlib.org/) is a free/open-source C++ library
