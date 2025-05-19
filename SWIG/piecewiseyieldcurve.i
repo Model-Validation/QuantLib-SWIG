@@ -212,6 +212,10 @@ class Name : public YieldTermStructure {
     const std::vector<Date>& dates() const;
     const std::vector<Time>& times() const;
     const std::vector<Real>& data() const;
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+
     #if !defined(SWIGR)
     std::vector<std::pair<Date,Real> > nodes() const;
     #endif
@@ -670,6 +674,9 @@ public:
     #if !defined(SWIGR)
     std::vector<std::pair<Date,Real> > nodes() const;
     #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
 };
 
 %shared_ptr(SpreadBSplineZeroCurve);
@@ -688,6 +695,9 @@ public:
     #if !defined(SWIGR)
     std::vector<std::pair<Date,Real> > nodes() const;
     #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
 };
 
 %shared_ptr(GlobalSpreadBSplineZeroCurve);
@@ -727,6 +737,9 @@ public:
     #if !defined(SWIGR)
     std::vector<std::pair<Date,Real> > nodes() const;
     #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
 };
 
 
@@ -761,6 +774,10 @@ class GlobalLinearSimpleZeroCurve : public YieldTermStructure {
     }
     const std::vector<Date>& dates() const;
     const std::vector<Time>& times() const;
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+
     #if !defined(SWIGR)
     std::vector<std::pair<Date,Real> > nodes() const;
     #endif
