@@ -35,8 +35,11 @@ using QuantLib::InterpolatedInstantaneousForwardCurve;
 %shared_ptr(InterpolatedForwardCurve<SplineCubic>);
 %shared_ptr(InterpolatedForwardCurve<ParabolicCubic>);
 %shared_ptr(InterpolatedForwardCurve<MonotonicParabolicCubic>);
+%shared_ptr(InterpolatedForwardCurve<BSplineModel>);
 %shared_ptr(InterpolatedTermForwardCurve<Linear>);
+%shared_ptr(InterpolatedTermForwardCurve<BSplineModel>);
 %shared_ptr(InterpolatedInstantaneousForwardCurve<Linear>);
+%shared_ptr(InterpolatedInstantaneousForwardCurve<BSplineModel>);
             
 template <class Interpolator>
 class InterpolatedForwardCurve : public YieldTermStructure {
@@ -57,6 +60,7 @@ class InterpolatedForwardCurve : public YieldTermStructure {
 %template(ForwardFlatForwardCurve) InterpolatedForwardCurve<ForwardFlat>;
 %template(LinearForwardCurve) InterpolatedForwardCurve<Linear>;
 %template(CubicForwardCurve) InterpolatedForwardCurve<Cubic>;
+%template(BSplineForwardCurve) InterpolatedForwardCurve<BSplineModel>;
 %template(NaturalCubicForwardCurve) InterpolatedForwardCurve<SplineCubic>;
 %template(ParabolicCubicForwardCurve) InterpolatedForwardCurve<ParabolicCubic>;
 %template(MonotonicParabolicCubicForwardCurve) InterpolatedForwardCurve<MonotonicParabolicCubic>;
@@ -78,6 +82,7 @@ class InterpolatedTermForwardCurve : public YieldTermStructure {
 };
 
 %template(TermForwardCurveLinear) InterpolatedTermForwardCurve<Linear>;
+%template(BSplineTermForwardCurve) InterpolatedTermForwardCurve<BSplineModel>;
 
 template <class Interpolator>
 class InterpolatedInstantaneousForwardCurve : public YieldTermStructure {
@@ -95,5 +100,6 @@ class InterpolatedInstantaneousForwardCurve : public YieldTermStructure {
 };
 
 %template(InstantaneousForwardCurveLinear) InterpolatedInstantaneousForwardCurve<Linear>;
+%template(BSplineInstantaneousForwardCurve) InterpolatedInstantaneousForwardCurve<BSplineModel>;
 
 #endif
