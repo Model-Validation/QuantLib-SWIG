@@ -460,6 +460,25 @@ class SplineLogCubic : public QuantLib::LogCubic {
                          CubicInterpolation::SecondDerivative, 0.0) {}
 };
 
+// class LogMixedLinearCubic : public QuantLib::LogMixedLinearCubic {
+//   public:
+//     // We add defaults for all constructor arguments because wrappers for
+//     // InterpolatedDiscountCurve and PiecewiseYieldCurve assume that all
+//     // interpolators have default constructors.
+//     LogMixedLinearCubic(
+//         Size n = 0,
+//         MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges,
+//         CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
+//         bool monotonic = true)
+//     : QuantLib::LogMixedLinearCubic(n, behavior, da, monotonic) {}
+// };
+
+// class MixedRateTimeLinearParabolic : public QuantLib::MixedRateTimeLinearParabolic {
+//   public:
+//     MixedRateTimeLinearParabolic(
+//         Size n = 0)
+//     : QuantLib::MixedRateTimeLinearParabolic(n) {}
+// };
 
 class ParabolicCubic : public QuantLib::Cubic {
   public:
@@ -537,6 +556,16 @@ struct MonotonicParabolicCubic {};
 struct LogParabolicCubic {};
 struct MonotonicLogParabolicCubic {};
 
+// struct LogMixedLinearCubic {
+//     #if !defined(SWIGJAVA) && !defined(SWIGCSHARP)
+//     %feature("kwargs") LogMixedLinearCubic;
+//     #endif
+//     LogMixedLinearCubic(
+//         Size n = 0,
+//         MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges,
+//         CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
+//         bool monotonic = true);
+// };
 
 
 %{
