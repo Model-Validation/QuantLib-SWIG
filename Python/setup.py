@@ -103,7 +103,7 @@ def library_dirs():
 
 def libraries():
 
-    libraries = []
+    libraries = ['scsindir']
 
     compiler = get_default_compiler()
 
