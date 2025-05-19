@@ -69,21 +69,22 @@ class CreditDefaultSwap : public Instrument {
         Midpoint,
         ISDA
     };
+    enum ProtectionPaymentTime { atDefault, atPeriodEnd, atMaturity };
 
     CreditDefaultSwap(Protection::Side side,
-                      Real notional,
-                      Rate spread,
-                      const Schedule& schedule,
-                      BusinessDayConvention paymentConvention,
-                      const DayCounter& dayCounter,
-                      bool settlesAccrual = true,
-                      bool paysAtDefaultTime = true,
-                      const Date& protectionStart = Date(),
-                      const ext::shared_ptr<Claim>& claim = {},
-                      const DayCounter& lastPeriodDayCounter = DayCounter(),
-                      const bool rebatesAccrual = true,
-                      const Date& tradeDate = Date(),
-                      Natural cashSettlementDays = 3);
+                  Real notional,
+                  Rate spread,
+                  const Schedule& schedule,
+                  BusinessDayConvention paymentConvention,
+                  const DayCounter& dayCounter,
+                  bool settlesAccrual = true,
+                  ProtectionPaymentTime protectionPaymentTime = CreditDefaultSwap::atDefault,
+                  const Date& protectionStart = Date(),
+                  const ext::shared_ptr<Claim>& claim = ext::shared_ptr<Claim>(),
+                  const DayCounter& lastPeriodDayCounter = DayCounter(),
+                  bool rebatesAccrual = true,
+                  const Date& tradeDate = Date(),
+                  Natural cashSettlementDays = 3);
     CreditDefaultSwap(Protection::Side side,
                       Real notional,
                       Rate upfront,
@@ -92,12 +93,12 @@ class CreditDefaultSwap : public Instrument {
                       BusinessDayConvention paymentConvention,
                       const DayCounter& dayCounter,
                       bool settlesAccrual = true,
-                      bool paysAtDefaultTime = true,
+                      CreditDefaultSwap::ProtectionPaymentTime protectionPaymentTime = CreditDefaultSwap::atDefault,
                       const Date& protectionStart = Date(),
                       const Date& upfrontDate = Date(),
-                      const ext::shared_ptr<Claim>& claim = {},
+                      const ext::shared_ptr<Claim>& claim = ext::shared_ptr<Claim>(),
                       const DayCounter& lastPeriodDayCounter = DayCounter(),
-                      const bool rebatesAccrual = true,
+                      bool rebatesAccrual = true,
                       const Date& tradeDate = Date(),
                       Natural cashSettlementDays = 3);
     Protection::Side side() const;
@@ -114,23 +115,28 @@ class CreditDefaultSwap : public Instrument {
         }
     }
     bool settlesAccrual() const;
-    bool paysAtDefaultTime() const;
+    CreditDefaultSwap::ProtectionPaymentTime protectionPaymentTime() const;
     std::vector<ext::shared_ptr<CashFlow> > coupons();
     const Date& protectionStartDate() const;
     const Date& protectionEndDate() const;
     bool rebatesAccrual() const;
     ext::shared_ptr<CashFlow> upfrontPayment() const;
     ext::shared_ptr<CashFlow> accrualRebate() const;
+    ext::shared_ptr<SimpleCashFlow>& accrualRebateCurrent() const;
     const Date& tradeDate() const;
     Natural cashSettlementDays() const;
+    Date maturity() const;
     Rate fairUpfront() const;
     Rate fairSpread() const;
+    Rate fairSpreadDirty() const;
+    Rate fairSpreadClean() const;
     Real couponLegBPS() const;
     Real upfrontBPS() const;
     Real couponLegNPV() const;
     Real defaultLegNPV() const;
     Real upfrontNPV() const;
     Real accrualRebateNPV() const;
+    Real accrualRebateNPVCurrent() const;
     Rate impliedHazardRate(Real targetNPV,
                            const Handle<YieldTermStructure>& discountCurve,
                            const DayCounter& dayCounter,
@@ -141,6 +147,10 @@ class CreditDefaultSwap : public Instrument {
                             const Handle<YieldTermStructure>& discountCurve,
                             const DayCounter& dayCounter,
                             CreditDefaultSwap::PricingModel model = CreditDefaultSwap::Midpoint) const;
+    std::vector<Date> protectionPaymentDates() const;
+    std::vector<Real> midpointDiscounts() const;
+    std::vector<Real> expectedLosses() const;
+    std::vector<Real> defaultProbabilities() const;
 };
 
 
