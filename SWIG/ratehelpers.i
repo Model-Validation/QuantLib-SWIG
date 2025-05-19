@@ -73,6 +73,14 @@ class RateHelper : public Observable {
     RateHelper();
 };
 
+%shared_ptr(NullRateHelper)
+class NullRateHelper : public RateHelper {
+  public:
+    NullRateHelper(
+      const Date pillarDate
+    );
+};
+
 %shared_ptr(DepositRateHelper)
 class DepositRateHelper : public RateHelper {
   public:
