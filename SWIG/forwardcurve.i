@@ -24,6 +24,8 @@
 
 %{
 using QuantLib::InterpolatedForwardCurve;
+using QuantLib::InterpolatedTermForwardCurve;
+using QuantLib::InterpolatedInstantaneousForwardCurve;
 %}
 
 %shared_ptr(InterpolatedForwardCurve<BackwardFlat>);
@@ -33,8 +35,9 @@ using QuantLib::InterpolatedForwardCurve;
 %shared_ptr(InterpolatedForwardCurve<SplineCubic>);
 %shared_ptr(InterpolatedForwardCurve<ParabolicCubic>);
 %shared_ptr(InterpolatedForwardCurve<MonotonicParabolicCubic>);
-
-
+%shared_ptr(InterpolatedTermForwardCurve<Linear>);
+%shared_ptr(InterpolatedInstantaneousForwardCurve<Linear>);
+            
 template <class Interpolator>
 class InterpolatedForwardCurve : public YieldTermStructure {
   public:
@@ -57,5 +60,40 @@ class InterpolatedForwardCurve : public YieldTermStructure {
 %template(NaturalCubicForwardCurve) InterpolatedForwardCurve<SplineCubic>;
 %template(ParabolicCubicForwardCurve) InterpolatedForwardCurve<ParabolicCubic>;
 %template(MonotonicParabolicCubicForwardCurve) InterpolatedForwardCurve<MonotonicParabolicCubic>;
+
+template <class Interpolator>
+class InterpolatedTermForwardCurve : public YieldTermStructure {
+  public:
+    InterpolatedTermForwardCurve(const std::vector<Date>& dates,
+                             const std::vector<Rate>& forwards,
+                             const ext::shared_ptr<IborIndex>& index,
+                             const Compounding comp = Simple,
+                             const Frequency freq = NoFrequency,
+                             const Interpolator& i = Interpolator());
+    const std::vector<Date>& dates() const;
+    const std::vector<Rate>& forwards() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Rate> > nodes() const;
+    #endif
+};
+
+%template(TermForwardCurveLinear) InterpolatedTermForwardCurve<Linear>;
+
+template <class Interpolator>
+class InterpolatedInstantaneousForwardCurve : public YieldTermStructure {
+  public:
+    InterpolatedInstantaneousForwardCurve(const std::vector<Date>& dates,
+                             const std::vector<Rate>& forwards,
+                             const DayCounter& dayCounter,
+                             const Calendar& calendar = Calendar(),
+                             const Interpolator& i = Interpolator());
+    const std::vector<Date>& dates() const;
+    const std::vector<Rate>& forwards() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Rate> > nodes() const;
+    #endif
+};
+
+%template(InstantaneousForwardCurveLinear) InterpolatedInstantaneousForwardCurve<Linear>;
 
 #endif
