@@ -28,7 +28,10 @@ using QuantLib::Observable;
 %}
 
 %shared_ptr(Observable);
-class Observable {};
+class Observable {
+    public:
+        void notifyObservers();
+};
 
 
 %extend Handle {
