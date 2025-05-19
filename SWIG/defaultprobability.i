@@ -34,6 +34,7 @@
 
 %{
 using QuantLib::DefaultProbabilityTermStructure;
+using QuantLib::BSplineModel;
 %}
 
 %shared_ptr(DefaultProbabilityTermStructure);
@@ -92,6 +93,7 @@ using QuantLib::InterpolatedHazardRateCurve;
 
 // add other instantiations both here and below the class
 %shared_ptr(InterpolatedHazardRateCurve<BackwardFlat>);
+%shared_ptr(InterpolatedHazardRateCurve<BSplineModel>);
 
 template <class Interpolator>
 class InterpolatedHazardRateCurve : public DefaultProbabilityTermStructure {
@@ -109,7 +111,7 @@ class InterpolatedHazardRateCurve : public DefaultProbabilityTermStructure {
 };
 
 %template(HazardRateCurve) InterpolatedHazardRateCurve<BackwardFlat>;
-
+%template(BSplineHazardRateCurve) InterpolatedHazardRateCurve<BSplineModel>;
 
 %{
 using QuantLib::InterpolatedDefaultDensityCurve;
@@ -117,6 +119,7 @@ using QuantLib::InterpolatedDefaultDensityCurve;
 
 // add other instantiations both here and below the class
 %shared_ptr(InterpolatedDefaultDensityCurve<Linear>);
+%shared_ptr(InterpolatedDefaultDensityCurve<BSplineModel>);
 
 template <class Interpolator>
 class InterpolatedDefaultDensityCurve : public DefaultProbabilityTermStructure {
@@ -134,6 +137,7 @@ class InterpolatedDefaultDensityCurve : public DefaultProbabilityTermStructure {
 };
 
 %template(DefaultDensityCurve) InterpolatedDefaultDensityCurve<Linear>;
+%template(BSplineDefaultDensityCurve) InterpolatedDefaultDensityCurve<BSplineModel>;
 
 
 %{
@@ -142,6 +146,8 @@ using QuantLib::InterpolatedSurvivalProbabilityCurve;
 
 // add other instantiations both here and below the class
 %shared_ptr(InterpolatedSurvivalProbabilityCurve<Linear>);
+%shared_ptr(InterpolatedSurvivalProbabilityCurve<LogLinear>);
+%shared_ptr(InterpolatedSurvivalProbabilityCurve<BSplineModel>);
 
 template <class Interpolator>
 class InterpolatedSurvivalProbabilityCurve : public DefaultProbabilityTermStructure {
@@ -159,7 +165,8 @@ class InterpolatedSurvivalProbabilityCurve : public DefaultProbabilityTermStruct
 };
 
 %template(SurvivalProbabilityCurve) InterpolatedSurvivalProbabilityCurve<Linear>;
-
+%template(LogSurvivalProbabilityCurve) InterpolatedSurvivalProbabilityCurve<LogLinear>;
+%template(BSplineProbabilityCurve) InterpolatedSurvivalProbabilityCurve<BSplineModel>;
 
 %{
 using QuantLib::DefaultProbabilityHelper;
@@ -293,6 +300,7 @@ class UpfrontCdsHelper : public DefaultProbabilityHelper {
 %{
 using QuantLib::HazardRate;
 using QuantLib::DefaultDensity;
+using QuantLib::SurvivalProbability;
 %}
 
 struct HazardRate {};
@@ -358,8 +366,176 @@ class Name : public DefaultProbabilityTermStructure {
 %enddef
 
 // add other instantiations if you need them
-export_piecewise_default_curve(PiecewiseFlatHazardRate,HazardRate,BackwardFlat);
+export_piecewise_default_curve(PiecewiseFlatHazardRate, HazardRate, BackwardFlat);
+export_piecewise_default_curve(PiecewiseForwardFlatHazardRate, HazardRate, ForwardFlat);
+export_piecewise_default_curve(PiecewiseLogLinearSurvivalProbability, SurvivalProbability, LogLinear);
 
+
+%define export_iterative_bspline_default_curve(Name, Traits)
+
+%{
+typedef PiecewiseDefaultCurve<Traits, BSplineModel> Name;
+%}
+
+%shared_ptr(Name);
+class Name: public DefaultProbabilityTermStructure {
+  public:
+    %extend {
+        Name(const Date& referenceDate,
+                        const std::vector<ext::shared_ptr<DefaultProbabilityHelper> >& instruments,
+                        const DayCounter& dayCounter,
+                        const BSplineModel& bsplineModel,
+                        const _IterativeBootstrap& b = _IterativeBootstrap()) {
+                return new Name(
+                    referenceDate, instruments, dayCounter, bsplineModel,
+                    Name::bootstrap_type(b.accuracy, b.minValue, b.maxValue));
+        };
+
+        Name(const Date& referenceDate,
+            const std::vector<ext::shared_ptr<DefaultProbabilityHelper> >& instruments,
+            const DayCounter& dayCounter,
+            const std::vector<Handle<Quote> >& jumps,
+            const std::vector<Date>& jumpDates,
+            const BSplineModel& bsplineModel,
+            const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new Name(
+                    referenceDate, instruments, dayCounter, jumps, jumpDates, bsplineModel,
+                    Name::bootstrap_type(b.accuracy));
+            }
+    }
+
+    const std::vector<Time>& times() const;
+    const std::vector<Date>& dates() const;
+    const std::vector<Real>& data() const;
+    std::vector<std::pair<Date, Real> > nodes() const;
+
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+%enddef
+
+%{
+// global bootstrapper
+class DefaultAdditionalErrors {
+  std::vector<ext::shared_ptr<DefaultProbabilityHelper> > additionalHelpers_;
+  public:
+    DefaultAdditionalErrors(const std::vector<ext::shared_ptr<DefaultProbabilityHelper> >& additionalHelpers)
+    : additionalHelpers_(additionalHelpers) {}
+    Array operator()() const {
+        Array errors(additionalHelpers_.size() - 2);
+        Real a = additionalHelpers_.front()->impliedQuote();
+        Real b = additionalHelpers_.back()->impliedQuote();
+        for (Size k = 0; k < errors.size(); ++k) {
+            errors[k] = (static_cast<Real>(errors.size()-k) * a + static_cast<Real>(1+k) * b) / static_cast<Real>(errors.size()+1)
+                - additionalHelpers_.at(1+k)->impliedQuote();
+        }
+        return errors;
+    }
+};
+
+struct _DefaultGlobalBootstrap {
+    std::vector<ext::shared_ptr<DefaultProbabilityHelper> > additionalHelpers;
+    std::vector<Date> additionalDates;
+    double accuracy;
+    _DefaultGlobalBootstrap(double accuracy = Null<double>())
+    : accuracy(accuracy) {}
+   _DefaultGlobalBootstrap(const std::vector<ext::shared_ptr<DefaultProbabilityHelper> >& additionalHelpers,
+                     const std::vector<Date>& additionalDates,
+                     double accuracy = Null<double>())
+    : additionalHelpers(additionalHelpers), additionalDates(additionalDates), accuracy(accuracy) {}
+};
+%}
+
+%rename(DefaultGlobalBootstrap) _DefaultGlobalBootstrap;
+struct _DefaultGlobalBootstrap {
+    _DefaultGlobalBootstrap(doubleOrNull accuracy = Null<double>());
+    _DefaultGlobalBootstrap(const std::vector<ext::shared_ptr<DefaultProbabilityHelper> >& additionalHelpers,
+                     const std::vector<Date>& additionalDates,
+                     doubleOrNull accuracy = Null<double>());
+};
+
+
+%define export_global_bspline_default_curve(Name, Traits)
+
+%{
+typedef PiecewiseDefaultCurve<Traits, BSplineModel, QuantLib::GlobalBootstrap> Name;
+%}
+
+%shared_ptr(Name);
+class Name: public DefaultProbabilityTermStructure {
+  public:
+    %extend {
+      Name(const Date& referenceDate,
+        const std::vector<ext::shared_ptr<DefaultProbabilityHelper> >& instruments,
+        const DayCounter& dayCounter,
+        const BSplineModel& bsplineModel,
+        const _DefaultGlobalBootstrap& b
+      ) {
+        if (b.additionalHelpers.empty()) {
+          return new Name(
+            referenceDate, instruments, dayCounter, bsplineModel,
+            Name::bootstrap_type(b.accuracy)
+          );
+        } else {
+          return new Name(
+            referenceDate, instruments, dayCounter, bsplineModel,
+            Name::bootstrap_type(b.additionalHelpers,
+              AdditionalDates(b.additionalDates),
+              DefaultAdditionalErrors(b.additionalHelpers),
+              b.accuracy
+            )
+          );
+        }
+      };
+
+      Name(const Date& referenceDate,
+        const std::vector<ext::shared_ptr<DefaultProbabilityHelper> >& instruments,
+        const DayCounter& dayCounter,
+        const std::vector<Handle<Quote> >& jumps,
+        const std::vector<Date>& jumpDates,
+        const BSplineModel& bsplineModel,
+        const _DefaultGlobalBootstrap& b
+      ) {
+        if (b.additionalHelpers.empty()) {
+          return new Name(
+            referenceDate, instruments, dayCounter, bsplineModel,
+            Name::bootstrap_type(b.accuracy)
+          );
+        } else {
+          return new Name(
+            referenceDate, instruments, dayCounter, bsplineModel,
+            Name::bootstrap_type(b.additionalHelpers,
+              AdditionalDates(b.additionalDates),
+              DefaultAdditionalErrors(b.additionalHelpers),
+              b.accuracy
+            )
+          );
+        }
+      };
+
+    }
+
+    const std::vector<Time>& times() const;
+    const std::vector<Date>& dates() const;
+    const std::vector<Real>& data() const;
+    std::vector<std::pair<Date, Real> > nodes() const;
+
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+%enddef
+
+export_iterative_bspline_default_curve(PiecewiseBSplineHazardCurve, HazardRate);
+export_iterative_bspline_default_curve(PiecewiseBSplineSurvivalProbabilityCurve, SurvivalProbability);
+export_iterative_bspline_default_curve(PiecewiseBSplineDefaultDensityCurve, DefaultDensity);
+
+export_global_bspline_default_curve(GlobalPiecewiseBSplineHazardCurve, HazardRate);
+export_global_bspline_default_curve(GlobalPiecewiseBSplineSurvivalProbabilityCurve, SurvivalProbability);
+export_global_bspline_default_curve(GlobalPiecewiseBSplineDefaultDensityCurve, DefaultDensity);
 
 // bond engine based on default probability
 
