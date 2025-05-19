@@ -27,6 +27,7 @@
 #endif
 
 %include exception.i
+%include std_string.i
 
 %exception {
     try {
@@ -45,6 +46,39 @@
 #include <ql/version.hpp>
 const int    __hexversion__ = QL_HEX_VERSION;
 const char* __version__    = QL_VERSION;
+
+#ifndef SWIG_BUILD_USER
+#    define SWIG_BUILD_USER "UnknownUser"
+#endif
+
+#ifndef SWIG_BUILD_MACHINE
+#    define SWIG_BUILD_MACHINE "UnknownMachine"
+#endif
+
+namespace QuantLib {
+    std::string swigBuildInfo() {
+        return "SWIG wrapper compiled on [" __DATE__ "] at [" __TIME__ "] by user [" SWIG_BUILD_USER "] on machine [" SWIG_BUILD_MACHINE "]";
+    }
+}
+%}
+
+namespace QuantLib {
+    std::string quantlibBuildInfo();
+    std::string swigBuildInfo();
+}
+
+%pythoncode %{
+    def python_library_info() -> str:
+        link_date : str = "LINK_DATE"
+        link_time : str = "LINK_TIME"
+        return "Python library created on [" + link_date +  "] at [" + link_time + "]"
+
+    def get_full_build_info():
+        quantlib_info : str = quantlibBuildInfo()
+        swig_info : str = swigBuildInfo()
+        linking_time : str = python_library_info()
+        return f"{quantlib_info}\n{swig_info}\n{linking_time}"
+
 %}
 
 const int __hexversion__;
