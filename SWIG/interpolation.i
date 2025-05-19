@@ -320,6 +320,33 @@ public:
 //     }
 // };
 
+// Expose the SpreadedInterpolationModel class
+// %shared_ptr(SpreadedInterpolationModel);
+%shared_ptr(SpreadedInterpolationModel<ZeroYield, Linear>);
+%shared_ptr(SpreadedInterpolationModel<ZeroYield, BSplineModel>);
+%shared_ptr(SpreadedInterpolationModel<TermForwardRate, BSplineModel>);
+
+template <class Traits, class Interpolator>
+class SpreadedInterpolationModel {
+  public:
+      // SpreadedInterpolationModel(Interpolator& factory, const ext::shared_ptr<YieldTermStructure>& baseCurve,
+      //   const std::optional<ext::shared_ptr<InterestRateIndex>>& index = std::nullopt);
+
+      %extend{
+        SpreadedInterpolationModel(Interpolator& factory, const ext::shared_ptr<YieldTermStructure>& baseCurve,
+          const ext::shared_ptr<InterestRateIndex>& index) {
+          return new SpreadedInterpolationModel<Traits, Interpolator>(factory, baseCurve, index);
+        }
+
+        SpreadedInterpolationModel(Interpolator& factory, const ext::shared_ptr<YieldTermStructure>& baseCurve) {
+          return new SpreadedInterpolationModel<Traits, Interpolator>(factory, baseCurve, std::nullopt);
+        }
+      };
+};
+
+%template(SpreadedZeroLinearModel) SpreadedInterpolationModel<ZeroYield, Linear>;
+%template(SpreadedZeroBSplineModel) SpreadedInterpolationModel<ZeroYield, BSplineModel>;
+%template(SpreadedTermForwardBSplineModel) SpreadedInterpolationModel<TermForwardRate, BSplineModel>;
 %define extend_spline(T)
 %extend Safe##T {
     Real derivative(Real x, bool extrapolate = false) {
@@ -433,18 +460,6 @@ class SplineLogCubic : public QuantLib::LogCubic {
                          CubicInterpolation::SecondDerivative, 0.0) {}
 };
 
-class LogMixedLinearCubic : public QuantLib::LogMixedLinearCubic {
-  public:
-    // We add defaults for all constructor arguments because wrappers for
-    // InterpolatedDiscountCurve and PiecewiseYieldCurve assume that all
-    // interpolators have default constructors.
-    LogMixedLinearCubic(
-        Size n = 0,
-        MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges,
-        CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
-        bool monotonic = true)
-    : QuantLib::LogMixedLinearCubic(n, behavior, da, monotonic) {}
-};
 
 class ParabolicCubic : public QuantLib::Cubic {
   public:
@@ -522,16 +537,6 @@ struct MonotonicParabolicCubic {};
 struct LogParabolicCubic {};
 struct MonotonicLogParabolicCubic {};
 
-struct LogMixedLinearCubic {
-    #if !defined(SWIGJAVA) && !defined(SWIGCSHARP)
-    %feature("kwargs") LogMixedLinearCubic;
-    #endif
-    LogMixedLinearCubic(
-        Size n = 0,
-        MixedInterpolation::Behavior behavior = MixedInterpolation::ShareRanges,
-        CubicInterpolation::DerivativeApprox da = CubicInterpolation::Spline,
-        bool monotonic = true);
-};
 
 
 %{

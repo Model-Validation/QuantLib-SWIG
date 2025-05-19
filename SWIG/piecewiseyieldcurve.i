@@ -646,24 +646,48 @@ public:
     };
 };
 
+// Expose the spread curve types
 %{
-class AdditionalErrors {
-    std::vector<ext::shared_ptr<RateHelper> > additionalHelpers_;
-  public:
-    AdditionalErrors(const std::vector<ext::shared_ptr<RateHelper> >& additionalHelpers)
-    : additionalHelpers_(additionalHelpers) {}
-    Array operator()() const {
-        Array errors(additionalHelpers_.size() - 2);
-        Real a = additionalHelpers_.front()->impliedQuote();
-        Real b = additionalHelpers_.back()->impliedQuote();
-        for (Size k = 0; k < errors.size(); ++k) {
-            errors[k] = (static_cast<Real>(errors.size()-k) * a + static_cast<Real>(1+k) * b) / static_cast<Real>(errors.size()+1)
-                - additionalHelpers_.at(1+k)->impliedQuote();
+typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<ZeroYield, Linear> > SpreadLinearZeroCurve;
+typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<ZeroYield, BSplineModel> > SpreadBSplineZeroCurve;
+typedef PiecewiseYieldCurve<ZeroYield, SpreadedInterpolationModel<ZeroYield, BSplineModel>, GlobalBootstrap > GlobalSpreadBSplineZeroCurve;
+typedef PiecewiseYieldCurve<TermForwardRate, SpreadedInterpolationModel<TermForwardRate, BSplineModel>, GlobalBootstrap > GlobalSpreadBSplineTermForwardCurve;
+%}
+
+%shared_ptr(SpreadLinearZeroCurve);
+class SpreadLinearZeroCurve : public YieldTermStructure {
+public:
+    %extend {
+        SpreadLinearZeroCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
+                         const DayCounter& dayCounter,
+                         const SpreadedInterpolationModel<ZeroYield, Linear>& spreadModel) {
+            return new SpreadLinearZeroCurve(referenceDate, rateHelpers, dayCounter, spreadModel);
         }
     }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
 };
 
+%shared_ptr(SpreadBSplineZeroCurve);
+class SpreadBSplineZeroCurve : public YieldTermStructure {
+public:
+    %extend {
+        SpreadBSplineZeroCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
+                         const DayCounter& dayCounter,
+                         const SpreadedInterpolationModel<ZeroYield, BSplineModel>& spreadModel) {
+            return new SpreadBSplineZeroCurve(referenceDate, rateHelpers, dayCounter, spreadModel);
+        }
     }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
 };
 
 %shared_ptr(GlobalSpreadBSplineZeroCurve);
@@ -687,6 +711,22 @@ public:
     };
 };
 
+%shared_ptr(GlobalSpreadBSplineTermForwardCurve);
+class GlobalSpreadBSplineTermForwardCurve : public YieldTermStructure {
+public:
+    %extend {
+        GlobalSpreadBSplineTermForwardCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper>>& rateHelpers,
+                         const ext::shared_ptr<IborIndex>& iborIndex,
+                         const SpreadedInterpolationModel<TermForwardRate, BSplineModel>& spreadModel) {
+            return new GlobalSpreadBSplineTermForwardCurve(referenceDate, rateHelpers, iborIndex, spreadModel);
+        }
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+    std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
 };
 
 
