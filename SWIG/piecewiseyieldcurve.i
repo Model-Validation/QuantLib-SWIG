@@ -261,6 +261,145 @@ typedef PiecewiseYieldCurve<InstantaneousForwardRate, BSplineModel> PiecewiseBSp
 typedef PiecewiseYieldCurve<InstantaneousForwardRate, BSplineModel, GlobalBootstrap> GlobalPiecewiseBSplineInstantaneousForwardCurve;
 %}
 
+%shared_ptr(PiecewiseBSplineDiscountCurve);
+class PiecewiseBSplineDiscountCurve : public YieldTermStructure {
+public:
+    %extend {
+        PiecewiseBSplineDiscountCurve(const Date& referenceDate,
+                         const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                         const DayCounter& dayCounter,
+                         const BSplineModel& bsplineModel,
+                         const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineDiscountCurve(referenceDate, rateHelpers, dayCounter, bsplineModel, make_bootstrap<PiecewiseBSplineDiscountCurve>(b));
+        };
+        PiecewiseBSplineDiscountCurve(const Date& referenceDate,
+             const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+             const DayCounter& dayCounter,
+             const std::vector<Handle<Quote> >& jumps,
+             const std::vector<Date>& jumpDates,
+             const BSplineModel& bsplineModel,
+             const _IterativeBootstrap& b = _IterativeBootstrap()) {
+            return new PiecewiseBSplineDiscountCurve(referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel, make_bootstrap<PiecewiseBSplineDiscountCurve>(b));
+        };
+        // PiecewiseBSplineDiscountCurve(const Date& referenceDate,
+        //                  const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+        //                 const ext::shared_ptr<IborIndex>& index,
+        //                  const BSplineModel& bsplineModel,
+        //                  const _IterativeBootstrap& b = _IterativeBootstrap()) {
+        //     return new PiecewiseBSplineDiscountCurve(referenceDate, rateHelpers, index, bsplineModel, make_bootstrap<PiecewiseBSplineDiscountCurve>(b));
+        // };
+        // PiecewiseBSplineDiscountCurve(const Date& referenceDate,
+        //      const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+        //                 const ext::shared_ptr<IborIndex>& index,
+        //      const std::vector<Handle<Quote> >& jumps,
+        //      const std::vector<Date>& jumpDates,
+        //      const BSplineModel& bsplineModel,
+        //      const _IterativeBootstrap& b = _IterativeBootstrap()) {
+        //     return new PiecewiseBSplineDiscountCurve(referenceDate, rateHelpers, index, jumps, jumpDates, bsplineModel, make_bootstrap<PiecewiseBSplineDiscountCurve>(b));
+        // };
+    }
+
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+        std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const override {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
+%shared_ptr(GlobalPiecewiseBSplineDiscountCurve);
+class GlobalPiecewiseBSplineDiscountCurve : public YieldTermStructure {
+public:
+    %extend {
+        GlobalPiecewiseBSplineDiscountCurve(const Date& referenceDate,
+                        const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+                        const DayCounter& dayCounter,
+                        const BSplineModel& bsplineModel,
+                        const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+                return new GlobalPiecewiseBSplineDiscountCurve(
+                    referenceDate, rateHelpers, dayCounter, bsplineModel,
+                    GlobalPiecewiseBSplineDiscountCurve::bootstrap_type(b.accuracy, b.optimizer, b.endCriteria));
+            } else {
+                return new GlobalPiecewiseBSplineDiscountCurve(
+                    referenceDate, rateHelpers, dayCounter, bsplineModel,
+                    GlobalPiecewiseBSplineDiscountCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy, b.optimizer, b.endCriteria));
+            }
+        };
+        GlobalPiecewiseBSplineDiscountCurve(const Date& referenceDate,
+            const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+            const DayCounter& dayCounter,
+            const std::vector<Handle<Quote> >& jumps,
+            const std::vector<Date>& jumpDates,
+            const BSplineModel& bsplineModel,
+            const _GlobalBootstrap& b) {
+            if (b.additionalHelpers.empty()) {
+            return new GlobalPiecewiseBSplineDiscountCurve(
+                    referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineDiscountCurve::bootstrap_type(b.accuracy, b.optimizer, b.endCriteria));
+            } else {
+                return new GlobalPiecewiseBSplineDiscountCurve(
+                    referenceDate, rateHelpers, dayCounter, jumps, jumpDates, bsplineModel,
+                    GlobalPiecewiseBSplineDiscountCurve::bootstrap_type(b.additionalHelpers,
+                                                                AdditionalDates(b.additionalDates),
+                                                                AdditionalErrors(b.additionalHelpers),
+                                                                b.accuracy, b.optimizer, b.endCriteria));
+            }
+        };
+        // GlobalPiecewiseBSplineDiscountCurve(const Date& referenceDate,
+        //                 const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+        //                 const ext::shared_ptr<IborIndex>& index,
+        //                 const BSplineModel& bsplineModel,
+        //                 const _GlobalBootstrap& b) {
+        //     if (b.additionalHelpers.empty()) {
+        //         return new GlobalPiecewiseBSplineDiscountCurve(
+        //             referenceDate, rateHelpers, index, bsplineModel,
+        //             GlobalPiecewiseBSplineDiscountCurve::bootstrap_type(b.accuracy, b.optimizer, b.endCriteria));
+        //     } else {
+        //         return new GlobalPiecewiseBSplineDiscountCurve(
+        //             referenceDate, rateHelpers, index, bsplineModel,
+        //             GlobalPiecewiseBSplineDiscountCurve::bootstrap_type(b.additionalHelpers,
+        //                                                         AdditionalDates(b.additionalDates),
+        //                                                         AdditionalErrors(b.additionalHelpers),
+        //                                                         b.accuracy, b.optimizer, b.endCriteria));
+        //     }
+        // };
+        // GlobalPiecewiseBSplineDiscountCurve(const Date& referenceDate,
+        //                 const std::vector<ext::shared_ptr<RateHelper> >& rateHelpers,
+        //                 const ext::shared_ptr<IborIndex>& index,
+        //                 const std::vector<Handle<Quote> >& jumps,
+        //                 const std::vector<Date>& jumpDates,
+        //                 const BSplineModel& bsplineModel,
+        //                 const _GlobalBootstrap& b) {
+        //     if (b.additionalHelpers.empty()) {
+        //         return new GlobalPiecewiseBSplineDiscountCurve(
+        //             referenceDate, rateHelpers, index, jumps, jumpDates, bsplineModel,
+        //             GlobalPiecewiseBSplineDiscountCurve::bootstrap_type(b.accuracy, b.optimizer, b.endCriteria));
+        //     } else {
+        //         return new GlobalPiecewiseBSplineDiscountCurve(
+        //             referenceDate, rateHelpers, index, jumps, jumpDates, bsplineModel,
+        //             GlobalPiecewiseBSplineDiscountCurve::bootstrap_type(b.additionalHelpers,
+        //                                                         AdditionalDates(b.additionalDates),
+        //                                                         AdditionalErrors(b.additionalHelpers),
+        //                                                         b.accuracy, b.optimizer, b.endCriteria));
+        //     }
+        // };
+    }
+    const std::vector<Date>& dates() const;
+    const std::vector<Time>& times() const;
+    #if !defined(SWIGR)
+        std::vector<std::pair<Date,Real> > nodes() const;
+    #endif
+    const Interpolation getInterpolation() const {
+        return ext::make_shared<Interpolation>(interpolation_);
+    };
+};
+
 %shared_ptr(PiecewiseBSplineZeroCurve);
 class PiecewiseBSplineZeroCurve : public YieldTermStructure {
 public:
