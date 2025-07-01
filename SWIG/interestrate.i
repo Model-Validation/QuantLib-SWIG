@@ -61,8 +61,16 @@ class InterestRate {
     DiscountFactor discountFactor(const Date& d1, const Date& d2,
                                   const Date& refStart = Date(),
                                   const Date& refEnd = Date()) const;
+    DiscountFactor discountFactorMinusOne(Time t) const;
+    DiscountFactor discountFactorMinusOne(const Date& d1, const Date& d2,
+                                  const Date& refStart = Date(),
+                                  const Date& refEnd = Date()) const;
     Real compoundFactor(Time t) const;
     Real compoundFactor(const Date& d1, const Date& d2,
+                        const Date& refStart = Date(),
+                        const Date& refEnd = Date()) const;
+    Real compoundFactorMinusOne(Time t) const;
+    Real compoundFactorMinusOne(const Date& d1, const Date& d2,
                         const Date& refStart = Date(),
                         const Date& refEnd = Date()) const;
     static InterestRate impliedRate(Real compound,
@@ -78,6 +86,29 @@ class InterestRate {
                                     const Date& d2,
                                     const Date& refStart = Date(),
                                     const Date& refEnd = Date());
+    static InterestRate impliedRateOnePlus(Real compoundMinusOne,
+                                    const DayCounter& resultDC,
+                                    Compounding comp,
+                                    Frequency freq,
+                                    Time t);
+    static InterestRate impliedRateOnePlus(Real compoundMinusOne,
+                                    const DayCounter& resultDC,
+                                    Compounding comp,
+                                    Frequency freq,
+                                    const Date& d1,
+                                    const Date& d2,
+                                    const Date& refStart = Date(),
+                                    const Date& refEnd = Date());
+    InterestRate equivalentRateOriginal(Compounding comp,
+                                Frequency freq,
+                                Time t) const;
+    InterestRate equivalentRateOriginal(const DayCounter& resultDayCounter,
+                                Compounding comp,
+                                Frequency freq,
+                                const Date& d1,
+                                const Date& d2,
+                                const Date& refStart = Date(),
+                                const Date& refEnd = Date()) const;
     InterestRate equivalentRate(Compounding comp,
                                 Frequency freq,
                                 Time t) const;
