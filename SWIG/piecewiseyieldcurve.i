@@ -252,6 +252,8 @@ export_piecewise_curve(PiecewiseMonotonicLogParabolicCubicDiscount,Discount,Mono
 
 %{
 // Expose the PiecewiseBSpline*Curve types
+typedef PiecewiseYieldCurve<Discount, BSplineModel> PiecewiseBSplineDiscountCurve;
+typedef PiecewiseYieldCurve<Discount, BSplineModel, GlobalBootstrap> GlobalPiecewiseBSplineDiscountCurve;
 typedef PiecewiseYieldCurve<ZeroYield, BSplineModel> PiecewiseBSplineZeroCurve;
 typedef PiecewiseYieldCurve<ZeroYield, BSplineModel, GlobalBootstrap> GlobalPiecewiseBSplineZeroCurve;
 typedef PiecewiseYieldCurve<ForwardRate, BSplineModel> PiecewiseBSplineForwardCurve;
