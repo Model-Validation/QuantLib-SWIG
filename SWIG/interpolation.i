@@ -27,6 +27,17 @@
 %include optimizers.i
 
 %{
+using QuantLib::Discount;
+using QuantLib::ZeroYield;
+using QuantLib::ForwardRate;
+using QuantLib::TermForwardRate;
+using QuantLib::RateTime;
+using QuantLib::BSplineModel;
+using QuantLib::InterestRateIndex;
+using QuantLib::YieldTermStructure;
+%}
+
+%{
 // safe versions which copy their arguments
 template <class I>
 class SafeInterpolation {

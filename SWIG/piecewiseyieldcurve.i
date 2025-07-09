@@ -20,6 +20,7 @@
 #ifndef quantlib_piecewise_yield_curve_i
 #define quantlib_piecewise_yield_curve_i
 
+
 %include termstructures.i
 %include ratehelpers.i
 %include interpolation.i
@@ -33,12 +34,10 @@ using QuantLib::Discount;
 using QuantLib::ZeroYield;
 using QuantLib::ForwardRate;
 using QuantLib::RateTime;
+using QuantLib::RateTimeLinear;
+using QuantLib::InstantaneousForwardRate;
 %}
 
-struct Discount {};
-struct ZeroYield {};
-struct ForwardRate {};
-struct RateTime {};
 
 // curve
 
@@ -49,6 +48,8 @@ using QuantLib::BSplineModel;
 using QuantLib::BSplineInterpolation;
 using QuantLib::BSplineStructure;
 using QuantLib::SplineConstraints;
+using QuantLib::IterativeBootstrap;
+using QuantLib::GlobalBootstrap;
 %}
 
 %{
@@ -249,8 +250,8 @@ export_piecewise_curve(PiecewiseMonotonicParabolicCubicZero,ZeroYield,MonotonicP
 export_piecewise_curve(PiecewiseLogParabolicCubicDiscount,Discount,LogParabolicCubic);
 export_piecewise_curve(PiecewiseMonotonicLogParabolicCubicDiscount,Discount,MonotonicLogParabolicCubic);
 
-// Expose the PiecewiseBSpline*Curve types
 %{
+// Expose the PiecewiseBSpline*Curve types
 typedef PiecewiseYieldCurve<ZeroYield, BSplineModel> PiecewiseBSplineZeroCurve;
 typedef PiecewiseYieldCurve<ZeroYield, BSplineModel, GlobalBootstrap> GlobalPiecewiseBSplineZeroCurve;
 typedef PiecewiseYieldCurve<ForwardRate, BSplineModel> PiecewiseBSplineForwardCurve;
