@@ -34,6 +34,11 @@
     #error at least QuantLib 1.38 required, please update
 #endif
 
+// Include experimental ISDA interface when enabled
+#ifdef QL_ENABLE_ISDA_CDS
+#include <ql/experimental/isda/isdacdsinterface.hpp>
+#endif
+
 #if defined (SWIGJAVA) || defined (SWIGCSHARP) 
   #ifndef QL_ENABLE_THREAD_SAFE_OBSERVER_PATTERN
     #ifdef BOOST_MSVC
@@ -193,3 +198,8 @@ QL_DEPRECATED_DISABLE_WARNING
 %include volatilitymodels.i
 %include zerocurve.i
 %include old_volatility.i
+
+// Experimental features (conditional compilation)
+#ifdef QL_ENABLE_ISDA_CDS
+%include experimentalisda.i
+#endif
