@@ -123,7 +123,10 @@ public:
                         const std::vector<Real>& b = {},
                         const std::vector<Real>& c = {},
                         const std::vector<ConstraintType>& constraintTypes = {},
-                        bool fitData = false);
+                        bool fitData = false,
+                        double epsAbsolute = 1e-12,
+                        double epsRelative = 1e-12,
+                        double epsInfeasible = 1e-13);
 
     Integer get_num_variables() const;
     Integer get_num_constraints() const;
