@@ -25,8 +25,8 @@ from setuptools._distutils.ccompiler import get_default_compiler
 def define_macros(py_limited_api):
 
     define_macros = []
-    if py_limited_api:
-        define_macros += [("Py_LIMITED_API", "0x03080000")]
+    # if py_limited_api:
+    #     define_macros += [("Py_LIMITED_API", "0x03080000")]
 
     compiler = get_default_compiler()
 
@@ -38,6 +38,18 @@ def define_macros(py_limited_api):
             ("_WINDOWS", None),
             ("NOMINMAX", None),
         ]
+        
+        # Add QuantLib configuration defines to match the build
+        define_macros += [
+            ("QL_BOOST_VERSION", "1_88_0"),  # Boost 1.88.0
+            ("QL_USE_STD_SHARED_PTR", "ON"),
+            ("QL_USE_STD_ANY", "ON"),
+            ("QL_USE_STD_OPTIONAL", "ON"),
+        ]
+        
+        # Add ISDA CDS define if enabled
+        if "QL_ENABLE_ISDA_CDS" in os.environ:
+            define_macros += [("QL_ENABLE_ISDA_CDS", None)]
 
     elif compiler == "unix":
         ql_compile_args = os.popen("quantlib-config --cflags").read()[:-1].split()
@@ -46,6 +58,11 @@ def define_macros(py_limited_api):
             (arg[2:], None) for arg in ql_compile_args if arg.startswith("-D")
         ]
         define_macros += [("NDEBUG", None)]
+        
+        # Add ISDA CDS define if enabled (if not already in quantlib-config)
+        if "QL_ENABLE_ISDA_CDS" in os.environ:
+            if not any(arg == "-DQL_ENABLE_ISDA_CDS" for arg in ql_compile_args):
+                define_macros += [("QL_ENABLE_ISDA_CDS", None)]
 
     return define_macros
 
@@ -67,11 +84,21 @@ def include_dirs():
             include_dirs += [
                 d.strip() for d in os.environ["INCLUDE"].split(";") if d.strip()
             ]
+            
+        # Add ISDA CDS include directory if enabled
+        if "QL_ENABLE_ISDA_CDS" in os.environ and "ISDA_CDS_ROOT" in os.environ:
+            isda_inc_dir = os.path.join(os.environ["ISDA_CDS_ROOT"], "lib", "include")
+            include_dirs += [isda_inc_dir]
 
     elif compiler == "unix":
         ql_compile_args = os.popen("quantlib-config --cflags").read()[:-1].split()
 
         include_dirs += [arg[2:] for arg in ql_compile_args if arg.startswith("-I")]
+        
+        # Add ISDA CDS include directory if enabled
+        if "QL_ENABLE_ISDA_CDS" in os.environ and "ISDA_CDS_ROOT" in os.environ:
+            isda_inc_dir = os.path.join(os.environ["ISDA_CDS_ROOT"], "lib", "include")
+            include_dirs += [isda_inc_dir]
 
     return include_dirs
 
@@ -92,18 +119,28 @@ def library_dirs():
         if "LIB" in os.environ:
             dirs = [dir for dir in os.environ["LIB"].split(";")]
             library_dirs += [d for d in dirs if d.strip()]
+            
+        # Add ISDA CDS library directory if enabled
+        if "QL_ENABLE_ISDA_CDS" in os.environ and "ISDA_CDS_ROOT" in os.environ:
+            isda_lib_dir = os.path.join(os.environ["ISDA_CDS_ROOT"], "build", "Release")
+            library_dirs += [isda_lib_dir]
 
     elif compiler == "unix":
         ql_link_args = os.popen("quantlib-config --libs").read()[:-1].split()
 
         library_dirs += [arg[2:] for arg in ql_link_args if arg.startswith("-L")]
+        
+        # Add ISDA CDS library directory if enabled
+        if "QL_ENABLE_ISDA_CDS" in os.environ and "ISDA_CDS_ROOT" in os.environ:
+            isda_lib_dir = os.path.join(os.environ["ISDA_CDS_ROOT"], "build", "lib")
+            library_dirs += [isda_lib_dir]
 
     return library_dirs
 
 
 def libraries():
 
-    libraries = ['scsindir']
+    libraries = ['scsdir']
 
     compiler = get_default_compiler()
 
@@ -111,6 +148,15 @@ def libraries():
         ql_link_args = os.popen("quantlib-config --libs").read()[:-1].split()
 
         libraries += [arg[2:] for arg in ql_link_args if arg.startswith("-l")]
+        
+        # Add ISDA CDS library if enabled
+        if "QL_ENABLE_ISDA_CDS" in os.environ:
+            libraries += ["cds"]
+    
+    elif compiler == "msvc":
+        # Add ISDA CDS library if enabled on Windows
+        if "QL_ENABLE_ISDA_CDS" in os.environ:
+            libraries += ["cds"]
 
     return libraries
 
@@ -122,7 +168,7 @@ def extra_compile_args():
     compiler = get_default_compiler()
 
     if compiler == "msvc":
-        extra_compile_args = ["/GR", "/FD", "/Zm250", "/EHsc", "/bigobj", "/std:c++17"]
+        extra_compile_args = ["/GR", "/FD", "/Zm250", "/EHsc", "/bigobj", "/std:c++17", '/wd4267', '/wd4996', '/wd4101']
 
         if "QL_STATIC_RUNTIME" in os.environ:
             extra_compile_args.append("/MT")
@@ -217,7 +263,7 @@ setup(
         Extension(
             name="QuantLib._QuantLib",
             sources=["src/QuantLib/quantlib_wrap.cpp"],
-            py_limited_api=py_limited_api,
+            # py_limited_api=py_limited_api,
             define_macros=define_macros(py_limited_api),
             include_dirs=include_dirs(),
             library_dirs=library_dirs(),
