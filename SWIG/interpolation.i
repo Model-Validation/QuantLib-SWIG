@@ -141,6 +141,37 @@ public:
     std::vector<ConstraintType> get_constraint_types() const;
 };
 
+// Fix enum exposure for BSplineSegment - create nested enum classes
+// This ensures proper nested access like ql.BSplineSegment.Side.Right instead of ql.BSplineSegment.Side_Right
+
+%pythoncode %{
+# Create nested enum classes for proper Python access
+class _BSplineSegmentSide:
+    Left = 0
+    Right = 1
+    Average = 2
+    Actual = 3
+    Inside = 4
+    None_ = 5  # Using None_ to avoid conflict with Python's None keyword
+
+class _BSplineSegmentInterpolationSmoothness:
+    Discontinuous = 0
+    Continuous = 1
+    ContinuouslyDifferentiable = 2
+    TwiceContinuouslyDifferentiable = 3
+    Hermite = 4
+    Default = 5
+
+class _BSplineSegmentInterpolationTransform:
+    Default = 0
+    Log = 1
+    Exp = 2
+    RateTime = 3
+    RateTimeAnnualToContinuous = 4
+    ContinuousToAnnual = 5
+    ContinuousToSimple = 6
+%}
+
 // Expose the BSplineSegment class
 %shared_ptr(BSplineSegment);
 class BSplineSegment {
@@ -150,7 +181,8 @@ public:
         Right,
         Average,
         Actual,
-        Inside
+        Inside,
+        None
     };
 
     enum class InterpolationSmoothness {
@@ -182,10 +214,18 @@ public:
         Size requiredPoints = 1,
         bool isGlobal = true);
 
+
+    #if defined(SWIGPYTHON)
+        %rename(get_spline_segments) getSplineSegmentsSwig;
+        %rename(evaluate_all) evaluateAllSwig;
+        %rename(get_num_variables) getNumVariablesSwig;
+    #endif
+
+    std::vector<Real> evaluateAllSwig(Real x, Integer degree = -1, QuantLib::BSplineSegment::Side side = QuantLib::BSplineSegment::Side::Right) const;
+
     std::pair<Real, Real> range() const;
     std::vector<Real> knots() const;
     Size degree() const;
-    std::vector<Real> evaluate_all(Real x, Integer degree, Side side) const;
     Real value(const std::vector<Real>& coefficients, Real t, Integer nu, Side side);
     std::vector<Real> value_functional(Real t, Side side) const;
     std::vector<Real> derivative_functional(Real t, Integer nu = 1, Integer degree = -1, Real x0 = 0.0, Side side = Side::None) const;
@@ -198,7 +238,7 @@ public:
 
     std::vector<Real> get_simple_knots() const;
     std::vector<Integer> get_knot_indices() const;
-    Natural get_num_variables() const;
+    Natural getNumVariablesSwig() const;
 
     InterpolationTransform interpolationTransform() const;
     InterpolationSmoothness interpolationSmoothness() const;
@@ -207,6 +247,14 @@ public:
     std::string interpolation_smoothness() const;
     std::string side_str() const;
 };
+
+// Attach the nested enum classes to BSplineSegment in Python
+%pythoncode %{
+# Attach nested enum classes to BSplineSegment for proper access
+BSplineSegment.Side = _BSplineSegmentSide
+BSplineSegment.InterpolationSmoothness = _BSplineSegmentInterpolationSmoothness  
+BSplineSegment.InterpolationTransform = _BSplineSegmentInterpolationTransform
+%}
 
 namespace std {
     %template(BSplineSegmentVector) std::vector<ext::shared_ptr<BSplineSegment>>;
@@ -221,23 +269,15 @@ class BSplineStructure {
             const ext::shared_ptr<SplineConstraints>& splineConstraints,
             bool useSegmentNodes = false, bool rejectZeroNode = true);
 
-    std::vector<Real> evaluate_all(Real x, BSplineSegment::Side side = BSplineSegment::Side::Right) const;
-    Real value(const std::vector<Real>& coefficients, Real x, Integer nu=0, BSplineSegment::Side side=BSplineSegment::Side::Right) const;
+#if defined(SWIGPYTHON)
+    %rename(get_num_variables) getNumVariablesSwig;
+    %rename(get_spline_segments) getSplineSegmentsSwig;
+    %rename(evaluate_all) evaluateAllSwig;
+#endif
 
-    std::vector<Real> transform(const std::vector<Real>& abscissae, const std::vector<Real>& values, BSplineSegment::Side side=BSplineSegment::Side::Right) const;
-    std::pair<Real, Real> range() const;
-
-    Integer get_num_variables() const;
-
-    std::vector<std::vector<Real>> get_interpolation_a() const;
-    std::vector<Real> get_interpolation_b() const;
-
-    void setConstraints(const ext::shared_ptr<SplineConstraints>& splineConstraints);
-    ext::shared_ptr<SplineConstraints> getConstraints() const;
-    std::vector<Real> solve_swig(const std::vector<Real>& parameters) const;
-    std::vector<Real> interpolate_swig(const std::vector<Real>& x, const std::vector<Real>& y);
-    std::vector<ext::shared_ptr<BSplineSegment>> get_spline_segments() const;
-
+    Integer getNumVariablesSwig() const;
+    std::vector<ext::shared_ptr<BSplineSegment>> getSplineSegmentsSwig() const;
+    std::vector<Real> evaluateAllSwig(Real x, BSplineSegment::Side side) const;
 };
 
 // Expose the BSplineModel class
