@@ -18,6 +18,13 @@
 """
 
 import os, sys, math, platform
+import warnings
+
+# Suppress setuptools deprecation warnings since we're called from CMake
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="setuptools")
+warnings.filterwarnings("ignore", message="setup.py install is deprecated")
+warnings.filterwarnings("ignore", message="License classifiers are deprecated")
+
 from setuptools import setup, Extension
 from setuptools._distutils.ccompiler import get_default_compiler
 
@@ -75,8 +82,14 @@ def include_dirs():
 
     if compiler == "msvc":
         try:
-            QL_INSTALL_DIR = os.environ["QL_DIR"]
-            include_dirs += [QL_INSTALL_DIR]
+            QL_INSTALL_DIR = os.environ.get("QL_DIR")
+            if QL_INSTALL_DIR:
+                # Use the QuantLib source directory directly
+                include_dirs += [QL_INSTALL_DIR]
+                # If 'ql' subdirectory exists, add it as well
+                ql_subdir = os.path.join(QL_INSTALL_DIR, "ql")
+                if os.path.isdir(ql_subdir):
+                    include_dirs += [ql_subdir]
         except KeyError:
             print("warning: unable to detect QuantLib installation")
 
@@ -99,6 +112,9 @@ def include_dirs():
         if "QL_ENABLE_ISDA_CDS" in os.environ and "ISDA_CDS_ROOT" in os.environ:
             isda_inc_dir = os.path.join(os.environ["ISDA_CDS_ROOT"], "lib", "include")
             include_dirs += [isda_inc_dir]
+
+    # Remove any build/install/include or build/install/include/ql from include_dirs
+    include_dirs = [d for d in include_dirs if not ("build/install/include" in d or "build\\install\\include" in d)]
 
     return include_dirs
 
@@ -154,6 +170,18 @@ def libraries():
             libraries += ["cds"]
     
     elif compiler == "msvc":
+        # Add QuantLib library for Windows
+        # The library name can be set via QL_LIBRARY_NAME environment variable
+        # or defaults to QuantLib-x64-mt-s for static runtime builds
+        ql_lib_name = os.environ.get("QL_LIBRARY_NAME")
+        if not ql_lib_name:
+            # Determine library name based on build configuration
+            if "QL_STATIC_RUNTIME" in os.environ:
+                ql_lib_name = "QuantLib-x64-mt-s"
+            else:
+                ql_lib_name = "QuantLib-x64-mt"
+        libraries += [ql_lib_name]
+        
         # Add ISDA CDS library if enabled on Windows
         if "QL_ENABLE_ISDA_CDS" in os.environ:
             libraries += ["cds"]
@@ -170,10 +198,13 @@ def extra_compile_args():
     if compiler == "msvc":
         extra_compile_args = ["/GR", "/FD", "/Zm250", "/EHsc", "/bigobj", "/std:c++17", '/wd4267', '/wd4996', '/wd4101']
 
+        # Add debug symbols if requested
+        if "QL_DEBUG_SYMBOLS" in os.environ:
+            extra_compile_args.extend(["/Zi", "/Od"])
+            
         if "QL_STATIC_RUNTIME" in os.environ:
             extra_compile_args.append("/MT")
-        else:
-            extra_compile_args.append("/MD")
+        # Don't add /MD - distutils already adds it by default
 
     elif compiler == "unix":
         ql_compile_args = os.popen("quantlib-config --cflags").read()[:-1].split()
@@ -204,6 +235,10 @@ def extra_link_args():
         else:
             machinetype = "/machine:x86"
         extra_link_args = ["/subsystem:windows", machinetype]
+        
+        # Add debug linking if requested
+        if "QL_DEBUG_SYMBOLS" in os.environ:
+            extra_link_args.append("/debug")
 
     elif compiler == "unix":
         ql_link_args = os.popen("quantlib-config --libs").read()[:-1].split()
@@ -248,7 +283,7 @@ py_limited_api = platform.python_implementation() == "CPython"
 
 setup(
     name="QuantLib",
-    version="1.39-dev",
+    version="1.39.dev0",
     description="Python bindings for the QuantLib library",
     long_description=long_description,
     long_description_content_type="text/x-rst",

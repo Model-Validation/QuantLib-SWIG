@@ -107,8 +107,34 @@ namespace std {
     %template(ConstraintTypeVector) std::vector<SplineConstraints::ConstraintType>;
 }
 
+// Create flattened container class for SplineConstraints enums
+%rename (SplineConstraints_ConstraintType) SplineConstraints::ConstraintType;
+
 // Expose the SplineConstraints class
 %shared_ptr(SplineConstraints);
+
+// Commented out to avoid SWIG shadowing warnings - conversion handled in Python
+// %extend SplineConstraints {
+//     SplineConstraints(Size nVariables,
+//                       const std::vector<std::vector<Real>>& P,
+//                       const std::vector<std::vector<Real>>& A,
+//                       const std::vector<Real>& b,
+//                       const std::vector<Real>& c,
+//                       const std::vector<int>& constraintTypesInt,
+//                       bool fitData,
+//                       double epsAbsolute = 1e-12,
+//                       double epsRelative = 1e-12,
+//                       double epsInfeasible = 1e-13) {
+//         // Convert integers to ConstraintType enum
+//         std::vector<SplineConstraints::ConstraintType> types;
+//         for (int typeInt : constraintTypesInt) {
+//             types.push_back(static_cast<SplineConstraints::ConstraintType>(typeInt));
+//         }
+//         return new SplineConstraints(nVariables, P, A, b, c, types, fitData, 
+//                                     epsAbsolute, epsRelative, epsInfeasible);
+//     }
+// }
+
 class SplineConstraints {
 public:
     // Expose the ConstraintType enum
@@ -116,6 +142,19 @@ public:
         Equal,
         LessEqual
     };
+
+    // New SCS-ordered constructor (constraints must be in SCS order: equalities first, then inequalities)
+    SplineConstraints(Size nVariables,
+                        const std::vector<std::vector<Real>>& P,
+                        const std::vector<std::vector<Real>>& A,
+                        const std::vector<Real>& b,
+                        const std::vector<Real>& c,
+                        Size numEqualities,
+                        Size numInequalities,
+                        bool fitData = false,
+                        double epsAbsolute = 1e-12,
+                        double epsRelative = 1e-12,
+                        double epsInfeasible = 1e-13);
 
     SplineConstraints(Size nVariables = 0,
                         const std::vector<std::vector<Real>>& P = {},
@@ -139,78 +178,81 @@ public:
     std::vector<Real> get_c_vector() const;
     std::vector<Real> get_parameters() const;
     std::vector<ConstraintType> get_constraint_types() const;
+    
+    // Inspection methods for debugging constraint ordering
+    std::vector<int> get_permutation() const;
+    std::vector<std::vector<Real>> get_reordered_a_matrix() const;
+    std::vector<Real> get_reordered_b_vector() const;
+    bool is_ordered() const;
+    Size get_num_equalities() const;
+    Size get_num_inequalities() const;
 };
 
-// Fix enum exposure for BSplineSegment - create nested enum classes
-// This ensures proper nested access like ql.BSplineSegment.Side.Right instead of ql.BSplineSegment.Side_Right
-
-%pythoncode %{
-# Create nested enum classes for proper Python access
-class _BSplineSegmentSide:
-    Left = 0
-    Right = 1
-    Average = 2
-    Actual = 3
-    Inside = 4
-    None_ = 5  # Using None_ to avoid conflict with Python's None keyword
-
-class _BSplineSegmentInterpolationSmoothness:
-    Discontinuous = 0
-    Continuous = 1
-    ContinuouslyDifferentiable = 2
-    TwiceContinuouslyDifferentiable = 3
-    Hermite = 4
-    Default = 5
-
-class _BSplineSegmentInterpolationTransform:
-    Default = 0
-    Log = 1
-    Exp = 2
-    RateTime = 3
-    RateTimeAnnualToContinuous = 4
-    ContinuousToAnnual = 5
-    ContinuousToSimple = 6
-%}
 
 // Expose the BSplineSegment class
 %shared_ptr(BSplineSegment);
+
+// Create flattened container classes following AnalyticHestonEngine pattern
+%rename (BSpline_Side) BSplineSegment::Side;
+%rename (BSpline_Type) BSplineSegment::InterpolationType;
+%rename (BSpline_Transform) BSplineSegment::InterpolationTransform;
+%rename (BSpline_Smoothness) BSplineSegment::InterpolationSmoothness;
+
 class BSplineSegment {
 public:
-    enum class Side {
-        Left,
-        Right,
-        Average,
-        Actual,
-        Inside,
-        None
+    // Simple enums like AnalyticHestonEngine for SWIG compatibility
+    enum Side { 
+        SideLeft, SideRight, SideAverage, SideActual, SideInside, SideDefault 
     };
-
-    enum class InterpolationSmoothness {
-        Discontinuous, // Internal knots repeated k times for k-th degree spline, aka C^{-1}
-        Continuous, // aka C^0
-        ContinuouslyDifferentiable, // aka C^1
-        TwiceContinuouslyDifferentiable, // aka C^2
-        Hermite,   // Internal knots are double, means C^{k-2} for a k-th degree spline
-        Default // Internal knots are simple, means C^{k-1} for a k-th degree spline
+    
+    enum InterpolationType {
+        TypeLinear,
+        TypeLinearRT,
+        TypeQuadraticSplineRT,
+        TypeCubicSpline,
+        TypeCubicSplineRT,
+        TypeHermite,
+        TypeHermiteRT,
+        TypePiecewiseQuadraticContFwd,
+        TypeConvexMonotone,
+        TypeShortest,
+        TypeClosest,
+        TypeFollowing,
+        TypePreceding
     };
-
-    enum class InterpolationTransform {
-      Default,
-      Log,
-      Exp,
-      RateTime,
-      RateTimeAnnualToContinuous,
-      ContinuousToAnnual,
-      ContinuousToSimple
+    
+    enum InterpolationTransform {
+        TransformDefault,
+        TransformLog,
+        TransformExp,
+        TransformRateTime,
+        TransformRateTimeAnnualToContinuous,
+        TransformContinuousToAnnual,
+        TransformContinuousToSimple
     };
+    
+    enum InterpolationSmoothness {
+        SmoothnessDiscontinuous, // Internal knots repeated k times for k-th degree spline, aka C^{-1}
+        SmoothnessContinuous,    // aka C^0
+        SmoothnessContinuouslyDifferentiable,      // aka C^1
+        SmoothnessTwiceContinuouslyDifferentiable, // aka C^2
+        SmoothnessHermite, // Internal knots are double, means C^{k-2} for a k-th degree spline
+        SmoothnessDefault  // Internal knots are simple, means C^{k-1} for a k-th degree spline
+    };
+    
+    // Compatibility typedefs for existing code
+    using SideEnum = Side;
+    using InterpolationTypeEnum = InterpolationType;
+    using InterpolationTransformEnum = InterpolationTransform;
+    using InterpolationSmoothnessEnum = InterpolationSmoothness;
 
     BSplineSegment(
         const std::vector<Real>& simpleKnots,
         Integer degree,
         const std::vector<Integer>& knotIndices,
-        QuantLib::BSplineSegment::InterpolationSmoothness smoothness = QuantLib::BSplineSegment::InterpolationSmoothness::Default,
-        QuantLib::BSplineSegment::InterpolationTransform interpolationTransform = QuantLib::BSplineSegment::InterpolationTransform::Default,
-        QuantLib::BSplineSegment::Side side = QuantLib::BSplineSegment::Side::Right,
+        InterpolationSmoothnessEnum smoothness = SmoothnessDefault,
+        InterpolationTransformEnum interpolationTransform = TransformDefault,
+        SideEnum side = SideRight,
         Size requiredPoints = 1,
         bool isGlobal = true);
 
@@ -221,14 +263,14 @@ public:
         %rename(get_num_variables) getNumVariablesSwig;
     #endif
 
-    std::vector<Real> evaluateAllSwig(Real x, Integer degree = -1, QuantLib::BSplineSegment::Side side = QuantLib::BSplineSegment::Side::Right) const;
+    std::vector<Real> evaluateAllSwig(Real x, Integer degree = -1, QuantLib::BSplineSegment::SideEnum side = QuantLib::BSplineSegment::SideRight) const;
 
     std::pair<Real, Real> range() const;
     std::vector<Real> knots() const;
     Size degree() const;
-    Real value(const std::vector<Real>& coefficients, Real t, Integer nu, Side side);
-    std::vector<Real> value_functional(Real t, Side side) const;
-    std::vector<Real> derivative_functional(Real t, Integer nu = 1, Integer degree = -1, Real x0 = 0.0, Side side = Side::None) const;
+    Real value(const std::vector<Real>& coefficients, Real t, Integer nu, SideEnum side);
+    std::vector<Real> value_functional(Real t, SideEnum side) const;
+    std::vector<Real> derivative_functional(Real t, Integer nu = 1, Integer degree = -1, Real x0 = 0.0, SideEnum side = SideDefault) const;
     std::vector<std::vector<Real>> derivative_matrix(Integer nu = 1, Integer degree = -1, bool differenceOperator = false) const;
     std::vector<std::vector<Real>> anti_derivative_matrix(Integer nu = -1, Integer degree = -1,
                                                          const std::vector<Real> t0 = {},
@@ -240,21 +282,13 @@ public:
     std::vector<Integer> get_knot_indices() const;
     Natural getNumVariablesSwig() const;
 
-    InterpolationTransform interpolationTransform() const;
-    InterpolationSmoothness interpolationSmoothness() const;
-    Side side() const;
+    InterpolationTransformEnum interpolationTransform() const;
+    InterpolationSmoothnessEnum interpolationSmoothness() const;
+    SideEnum side() const;
     std::string interpolation_transform() const;
     std::string interpolation_smoothness() const;
     std::string side_str() const;
 };
-
-// Attach the nested enum classes to BSplineSegment in Python
-%pythoncode %{
-# Attach nested enum classes to BSplineSegment for proper access
-BSplineSegment.Side = _BSplineSegmentSide
-BSplineSegment.InterpolationSmoothness = _BSplineSegmentInterpolationSmoothness  
-BSplineSegment.InterpolationTransform = _BSplineSegmentInterpolationTransform
-%}
 
 namespace std {
     %template(BSplineSegmentVector) std::vector<ext::shared_ptr<BSplineSegment>>;
@@ -277,7 +311,7 @@ class BSplineStructure {
 
     Integer getNumVariablesSwig() const;
     std::vector<ext::shared_ptr<BSplineSegment>> getSplineSegmentsSwig() const;
-    std::vector<Real> evaluateAllSwig(Real x, BSplineSegment::Side side) const;
+    std::vector<Real> evaluateAllSwig(Real x, BSplineSegment::SideEnum side) const;
 };
 
 // Expose the BSplineModel class
@@ -332,6 +366,64 @@ public:
     ext::shared_ptr<BSplineInterpolation> as_bspline_interpolation(const ext::shared_ptr<Interpolation>& ip) {
         return ext::dynamic_pointer_cast<BSplineInterpolation>(ip);
     }
+%}
+
+// Create Python-accessible enum containers
+%pythoncode %{
+# Create enum containers that mimic the AnalyticHestonEngine_OptimalAlpha pattern
+class BSpline_Side:
+    Left = BSplineSegment.SideLeft
+    Right = BSplineSegment.SideRight
+    Average = BSplineSegment.SideAverage
+    Actual = BSplineSegment.SideActual
+    Inside = BSplineSegment.SideInside
+    Default = BSplineSegment.SideDefault
+
+class BSpline_Type:
+    Linear = BSplineSegment.TypeLinear
+    LinearRT = BSplineSegment.TypeLinearRT
+    QuadraticSplineRT = BSplineSegment.TypeQuadraticSplineRT
+    CubicSpline = BSplineSegment.TypeCubicSpline
+    CubicSplineRT = BSplineSegment.TypeCubicSplineRT
+    Hermite = BSplineSegment.TypeHermite
+    HermiteRT = BSplineSegment.TypeHermiteRT
+    PiecewiseQuadraticContFwd = BSplineSegment.TypePiecewiseQuadraticContFwd
+    ConvexMonotone = BSplineSegment.TypeConvexMonotone
+    Shortest = BSplineSegment.TypeShortest
+    Closest = BSplineSegment.TypeClosest
+    Following = BSplineSegment.TypeFollowing
+    Preceding = BSplineSegment.TypePreceding
+
+class BSpline_Transform:
+    Default = BSplineSegment.TransformDefault
+    Log = BSplineSegment.TransformLog
+    Exp = BSplineSegment.TransformExp
+    RateTime = BSplineSegment.TransformRateTime
+    RateTimeAnnualToContinuous = BSplineSegment.TransformRateTimeAnnualToContinuous
+    ContinuousToAnnual = BSplineSegment.TransformContinuousToAnnual
+    ContinuousToSimple = BSplineSegment.TransformContinuousToSimple
+
+class BSpline_Smoothness:
+    Default = BSplineSegment.SmoothnessDefault
+    Discontinuous = BSplineSegment.SmoothnessDiscontinuous
+    Continuous = BSplineSegment.SmoothnessContinuous
+    ContinuouslyDifferentiable = BSplineSegment.SmoothnessContinuouslyDifferentiable
+    TwiceContinuouslyDifferentiable = BSplineSegment.SmoothnessTwiceContinuouslyDifferentiable
+    Hermite = BSplineSegment.SmoothnessHermite
+
+# Create flat middle container class (like AnalyticHestonEngine_OptimalAlpha pattern)
+# SWIG generates SplineConstraints.SplineConstraints_ConstraintType_Equal at class level
+class SplineConstraints_ConstraintType:
+    Equal = SplineConstraints.SplineConstraints_ConstraintType_Equal
+    LessEqual = SplineConstraints.SplineConstraints_ConstraintType_LessEqual
+
+# Also create nested access for SplineConstraints.ConstraintType.Equal pattern
+class _ConstraintType:
+    Equal = SplineConstraints.SplineConstraints_ConstraintType_Equal
+    LessEqual = SplineConstraints.SplineConstraints_ConstraintType_LessEqual
+
+# Attach as nested class to SplineConstraints
+SplineConstraints.ConstraintType = _ConstraintType
 %}
 
 

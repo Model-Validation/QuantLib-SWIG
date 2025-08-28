@@ -58,8 +58,9 @@ def include_dirs():
 
     if compiler == "msvc":
         try:
-            QL_INSTALL_DIR = os.environ["QL_DIR"]
-            include_dirs += [QL_INSTALL_DIR]
+            QL_INSTALL_DIR = os.environ.get("QL_DIR")
+            if QL_INSTALL_DIR:
+                include_dirs += [QL_INSTALL_DIR]
         except KeyError:
             print("warning: unable to detect QuantLib installation")
 
@@ -68,10 +69,23 @@ def include_dirs():
                 d.strip() for d in os.environ["INCLUDE"].split(";") if d.strip()
             ]
 
+        # Add ISDA CDS include directory if enabled
+        if "QL_ENABLE_ISDA_CDS" in os.environ and "ISDA_CDS_ROOT" in os.environ:
+            isda_inc_dir = os.path.join(os.environ["ISDA_CDS_ROOT"], "lib", "include")
+            include_dirs += [isda_inc_dir]
+
     elif compiler == "unix":
         ql_compile_args = os.popen("quantlib-config --cflags").read()[:-1].split()
 
         include_dirs += [arg[2:] for arg in ql_compile_args if arg.startswith("-I")]
+
+        # Add ISDA CDS include directory if enabled
+        if "QL_ENABLE_ISDA_CDS" in os.environ and "ISDA_CDS_ROOT" in os.environ:
+            isda_inc_dir = os.path.join(os.environ["ISDA_CDS_ROOT"], "lib", "include")
+            include_dirs += [isda_inc_dir]
+
+    # Remove any build/install/include or build/install/include/ql from include_dirs
+    include_dirs = [d for d in include_dirs if not ("build/install/include" in d or "build\\install\\include" in d)]
 
     return include_dirs
 

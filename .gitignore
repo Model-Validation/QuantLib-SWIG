@@ -51,3 +51,23 @@ testCaseCollection.xml
 *.pch
 *.idb
 *.ipch
+/.vs
+Python/async_swig_progress.py
+Python/build_with_isda.cmd
+Python/examples/isda-cds-interface.py
+Python/file_monitor_swig.py
+Python/link_output.txt
+Python/README_ISDA_CDS.md
+Python/simple_swig_progress.py
+Python/swig_fancy.cmd
+Python/swig_progress.py
+Python/swig_with_isda.cmd
+Python/swig_with_progress.ps1
+Python/test_link.bat
+Python/test_link2.bat
+Python/test_link3.bat
+Python/tqdm_swig_progress.py
+Python/wheelhouse/quantlib-1.39.dev0-cp38-abi3-win_amd64.whl
+
+# Development reports
+Summary_Report.md

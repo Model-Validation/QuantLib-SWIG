@@ -47,13 +47,8 @@
 const int    __hexversion__ = QL_HEX_VERSION;
 const char* __version__    = QL_VERSION;
 
-#ifndef SWIG_BUILD_USER
-#    define SWIG_BUILD_USER "UnknownUser"
-#endif
-
-#ifndef SWIG_BUILD_MACHINE
-#    define SWIG_BUILD_MACHINE "UnknownMachine"
-#endif
+#define SWIG_BUILD_USER "s9321b"
+#define SWIG_BUILD_MACHINE "B5824175"
 
 namespace QuantLib {
     std::string swigBuildInfo() {
@@ -130,3 +125,4 @@ const char* __version__;
 #endif
 
 %include ql.i
+
