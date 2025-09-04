@@ -816,5 +816,14 @@ class SafeConvexMonotoneInterpolation {
     Real operator()(Real x, bool allowExtrapolation=false);
 };
 
+// Include debug inspection interface
+%include bspline_debug.i
+
+// Add debug extensions to B-spline classes
+%extend BSplineStructure {
+    void printDebugInfo() {
+        QuantLib::BSplineDebugInspector::printBasicInfo(*$self);
+    }
+}
 
 #endif
