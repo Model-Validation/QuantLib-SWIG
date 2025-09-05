@@ -101,6 +101,9 @@ using QuantLib::BSplineInterpolation;
 using QuantLib::SpreadedInterpolationModel;
 using QuantLib::SpreadedInterpolation;
 using QuantLib::Linear;
+using QuantLib::InterpolationMode;
+using QuantLib::ModeSpan;
+using QuantLib::generateVoronoiModeSpans;
 %}
 
 namespace std {
@@ -313,6 +316,35 @@ class BSplineStructure {
     std::vector<ext::shared_ptr<BSplineSegment>> getSplineSegmentsSwig() const;
     std::vector<Real> evaluateAllSwig(Real x, BSplineSegment::SideEnum side) const;
 };
+
+// Expose InterpolationMode enum
+enum class InterpolationMode {
+    HARD,   // Exact interpolation constraints
+    LS,     // Least squares fitting
+    AUTO    // Automatically determine based on DOF
+};
+
+// Expose ModeSpan struct
+struct ModeSpan {
+    Real start;
+    Real end;
+    InterpolationMode mode;
+    
+    ModeSpan(Real s, Real e, InterpolationMode m);
+};
+
+namespace std {
+    %template(ModeSpanVector) std::vector<ModeSpan>;
+}
+
+// Expose Voronoi span generation function
+std::vector<ModeSpan> generateVoronoiModeSpans(
+    const std::vector<Real>& dataPoints,
+    Real domainStart,
+    Real domainEnd,
+    Real densityThreshold = 2.0,
+    Real boundaryWidth = 0.1
+);
 
 // Expose the BSplineModel class
 %shared_ptr(BSplineModel);
