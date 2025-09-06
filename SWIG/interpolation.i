@@ -25,6 +25,18 @@
 %include termstructures.i
 %include linearalgebra.i
 %include optimizers.i
+%include exception.i
+
+// Add exception handling for safer C++ to Python transitions
+%exception {
+    try {
+        $action
+    } catch (const std::exception& e) {
+        SWIG_exception(SWIG_RuntimeError, e.what());
+    } catch (...) {
+        SWIG_exception(SWIG_UnknownError, "Unknown error in QuantLib");
+    }
+}
 
 %{
 using QuantLib::Discount;
@@ -92,6 +104,7 @@ make_safe_interpolation(MonotonicLogParabolic,MonotonicLogParabolic);
 make_safe_interpolation(LagrangeInterpolation,LagrangeInterpolation); 
 
 %{
+#include <ql/math/interpolations/bsplineinterpolation/stagedproblem.hpp>
 using QuantLib::Interpolation;
 using QuantLib::BSplineModel;
 using QuantLib::BSplineSegment;
@@ -299,6 +312,16 @@ namespace std {
 
 // Expose the BSplineStructure class
 %shared_ptr(BSplineStructure);
+
+// IMPORTANT: Ignore the problematic enum vector overloads to avoid SWIG confusion
+%ignore BSplineStructure::interpolate_swig_modes(const std::vector<Real>&, 
+                                                  const std::vector<Real>&, 
+                                                  const std::vector<QuantLib::InterpolationMode>&);
+%ignore BSplineStructure::interpolate_swig_weighted(const std::vector<Real>&, 
+                                                     const std::vector<Real>&, 
+                                                     const std::vector<QuantLib::InterpolationMode>&, 
+                                                     const std::vector<Real>&);
+
 class BSplineStructure {
   public:
     BSplineStructure(
@@ -315,16 +338,41 @@ class BSplineStructure {
     Integer getNumVariablesSwig() const;
     std::vector<ext::shared_ptr<BSplineSegment>> getSplineSegmentsSwig() const;
     std::vector<Real> evaluateAllSwig(Real x, BSplineSegment::SideEnum side) const;
+    
+    // Basic interpolation (will be renamed in Python)
+    %rename(interpolate) interpolate_swig;
+    std::vector<Real> interpolate_swig(const std::vector<Real>& interpolationNodes,
+                                       const std::vector<Real>& values);
+    
+    // Integer overloads for SWIG (enum class conversion workaround)
+    // These are the ONLY modes-based interpolate methods we expose
+    %rename(interpolate) interpolate_swig_modes_int;
+    std::vector<Real> interpolate_swig_modes_int(const std::vector<Real>& interpolationNodes,
+                                                  const std::vector<Real>& values,
+                                                  const std::vector<Integer>& modes);
+    
+    %rename(interpolate) interpolate_swig_weighted_int;
+    std::vector<Real> interpolate_swig_weighted_int(const std::vector<Real>& interpolationNodes,
+                                                     const std::vector<Real>& values,
+                                                     const std::vector<Integer>& modes,
+                                                     const std::vector<Real>& weights);
 };
 
-// Expose InterpolationMode enum
-enum class InterpolationMode {
-    HARD,   // Exact interpolation constraints
-    LS,     // Least squares fitting
-    AUTO    // Automatically determine based on DOF
-};
+// SWIG workaround for enum class - expose as integer constants
+%inline %{
+namespace QuantLib {
+    // Define integer constants matching the enum class values
+    const int InterpolationMode_HARD = static_cast<int>(QuantLib::InterpolationMode::HARD);
+    const int InterpolationMode_LS = static_cast<int>(QuantLib::InterpolationMode::LS);
+    const int InterpolationMode_AUTO = static_cast<int>(QuantLib::InterpolationMode::AUTO);
+}
+%}
 
-// Expose ModeSpan struct
+// Expose ModeSpan struct  
+%{
+using QuantLib::ModeSpan;
+%}
+
 struct ModeSpan {
     Real start;
     Real end;
@@ -334,17 +382,20 @@ struct ModeSpan {
 };
 
 namespace std {
-    %template(ModeSpanVector) std::vector<ModeSpan>;
+    %template(ModeSpanVector) std::vector<QuantLib::ModeSpan>;
+    %template(InterpolationModeVector) std::vector<QuantLib::InterpolationMode>;
 }
 
 // Expose Voronoi span generation function
-std::vector<ModeSpan> generateVoronoiModeSpans(
-    const std::vector<Real>& dataPoints,
-    Real domainStart,
-    Real domainEnd,
-    Real densityThreshold = 2.0,
-    Real boundaryWidth = 0.1
-);
+namespace QuantLib {
+    std::vector<ModeSpan> generateVoronoiModeSpans(
+        const std::vector<Real>& dataPoints,
+        Real domainStart,
+        Real domainEnd,
+        Real densityThreshold = 2.0,
+        Real boundaryWidth = 0.1
+    );
+}
 
 // Expose the BSplineModel class
 %shared_ptr(BSplineModel);
@@ -847,6 +898,7 @@ class SafeConvexMonotoneInterpolation {
                                     bool forcePositive = true);
     Real operator()(Real x, bool allowExtrapolation=false);
 };
+
 
 // Include debug inspection interface
 %include bspline_debug.i
