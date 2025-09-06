@@ -71,3 +71,4 @@ Python/wheelhouse/quantlib-1.39.dev0-cp38-abi3-win_amd64.whl
 
 # Development reports
 Summary_Report.md
+*.pyd
