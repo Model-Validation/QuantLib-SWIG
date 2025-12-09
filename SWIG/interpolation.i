@@ -403,7 +403,7 @@ class BSplineModel {
 public:
     BSplineModel(ext::shared_ptr<BSplineStructure>& splineStructure);
 
-    ext::shared_ptr<BSplineInterpolation> interpolate(const std::vector<Real>& x, const std::vector<Real> y) const;
+    ext::shared_ptr<BSplineInterpolation> interpolate(const std::vector<Real>& x, const std::vector<Real> y, bool enableExtrapolation = true) const;
     Real getStartPoint() const;
     Real getEndPoint() const;
     ext::shared_ptr<BSplineStructure> get_structure() const;
@@ -430,7 +430,8 @@ public:
     BSplineInterpolation(
       const std::vector<Time>& x,
       const std::vector<Real>& y,
-      const ext::shared_ptr<BSplineStructure>& splineStructure
+      const ext::shared_ptr<BSplineStructure>& splineStructure,
+      bool enableExtrapolation = true
     );
     Real operator()(Real x, bool allowExtrapolation = false) const;
     Real primitive(Real x, bool allowExtrapolation = false) const;
